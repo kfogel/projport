@@ -1,0 +1,3 @@
+Get Google GData Python API client library:
+
+  hg clone https://gdata-python-client.googlecode.com/hg/ gdata-python-client
