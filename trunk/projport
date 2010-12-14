@@ -307,8 +307,7 @@ def issue_from_jira(jira_xml_obj):
                 date_from_string(safe(jira_xml_obj.updated)),
                 safe(jira_xml_obj.version),
                 safe(jira_xml_obj.fixVersion))
-  sys.stdout.flush()
-  print issue
+  return issue
 
 
 class Project():
@@ -406,7 +405,8 @@ def main():
   if issues.channel:
     issues = issues.channel.item
   for jira_issue in issues:
-    issue_from_jira(jira_issue)
+    issue = issue_from_jira(jira_issue)
+    print issue
   issues_xml.close()
 
 if __name__ == '__main__':
