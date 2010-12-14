@@ -221,19 +221,20 @@ def date_from_string(s):
 
 class Issue():
   def __init__(self,
-               summary,                # (string) One-liner summary.
-               description,            # (string) Initial description.
-               source_link,            # (string) URL to original bug.
-               source_key,             # (string) Unique id of original bug.
-               issue_type,             # (string) defect / task / enhancement
-               priority,               # (string) 
-               status,                 # (string)
-               resolution,             # (string)
-               assignee,               # (string)
-               date_created,           # (datetime)
-               date_last_updated,      # (datetime)
-               version_filed_against,  # (string)
-               version_fixed_for,      # (string)
+               summary,                # string: One-liner summary.
+               description,            # string: Initial description.
+               source_link,            # string: URL to original bug.
+               source_key,             # string: Unique id of original bug.
+               issue_type,             # string: defect / task / enhancement
+               priority,               # string: 
+               status,                 # string:
+               resolution,             # string:
+               reporter,               # (string, string): realname, username
+               assignee,               # (string, string): realname, username
+               date_created,           # datetime:
+               date_last_updated,      # datetime:
+               version_filed_against,  # string:
+               version_fixed_for,      # string:
                ):
     self.summary               = summary
     self.description           = description
@@ -243,6 +244,7 @@ class Issue():
     self.priority              = priority
     self.status                = status
     self.resolution            = resolution
+    self.reporter              = reporter
     self.assignee              = assignee
     self.date_created          = date_created
     self.date_last_updated     = date_last_updated
@@ -254,7 +256,8 @@ class Issue():
   %s
   
   Source URL:      %s
-  Assignee:        %s
+  Reporter:        %s (%s)
+  Assignee:        %s (%s)
   Type:            %s
   Priority:        %s
   Status:          %s
@@ -269,7 +272,8 @@ class Issue():
          self.summary,
          self.description,
          self.source_link,
-         self.assignee,
+         self.reporter[0], self.reporter[1],
+         self.assignee[0], self.assignee[1],
          self.issue_type,
          self.priority,
          self.status,
@@ -295,7 +299,10 @@ def issue_from_jira(jira_xml_obj):
                 safe(jira_xml_obj.priority),
                 safe(jira_xml_obj.status),
                 safe(jira_xml_obj.resolution),
-                safe(jira_xml_obj.assignee),
+                (safe(jira_xml_obj.reporter.data),
+                 safe(jira_xml_obj.reporter.username)),
+                (safe(jira_xml_obj.assignee.data),
+                 safe(jira_xml_obj.assignee.username)),
                 date_from_string(safe(jira_xml_obj.created)),
                 date_from_string(safe(jira_xml_obj.updated)),
                 safe(jira_xml_obj.version),
