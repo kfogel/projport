@@ -1,3 +1,12 @@
+Usage:
+
+  ./projport --project projport                               \
+             --username yourname@gmail.com                    \
+             --password yourpass                              \
+             --issues-type jira                               \
+             --issues-xml sampledata/eas-jira-issues-1.xml 
+
+Resources:
 
 http://googlecode.blogspot.com/2009/10/issue-tracker-data-api-for-project.html
 http://code.google.com/p/support/wiki/IssueTrackerAPI
