@@ -22,23 +22,35 @@ def usage(output_stream=sys.stdout):
   output_stream.write("TBD\n")
 
 
-def authenticating_client(client, project, username, password):
-  return client.client_login(username, password, source=project, service='code')
+class Project():
+  """A GCH Project, reachable through a client."""
+  def __init__(self, name, client):
+    self.name = name
+    self.client = client
+    
+  def show_all_issues(self):
+    """Show all the issues in a project."""
+    feed = self.client.get_issues(self.name)
+    for issue in feed.entry:
+      print issue.title.text
+
+  def create_issue(self, title, summary):
+    """Create an issue."""
+    return self.client.add_issue(self.name, title, summary,
+                                 "kfogel@gmail.com", labels=[])
 
 
-def retrieve_all_issues(client, project):
-  """Retrieve all the issues in a project."""
-  feed = client.get_issues(project)
-  for issue in feed.entry:
-    print issue.title.text
+def authenticate_client(client, project, username, password):
+  """Authenticate CLIENT to PROJECT, with USERNAME and PASSWORD."""
+  client.client_login(username, password, source=project, service='code')
 
 
 def main():
-  error_exit  = False
-  project     = None
-  username    = None
-  password    = None
-  issues_xml  = None
+  error_exit   = False
+  project_name = None
+  username     = None
+  password     = None
+  issues_xml   = None
 
   try:
     opts, args = getopt.getopt(sys.argv[1:],
@@ -57,7 +69,7 @@ def main():
       usage()
       sys.exit(0)
     elif opt == '--project':
-      project = val
+      project_name = val
     elif opt == '--username':
       username = val
     elif opt == '--password':
@@ -71,9 +83,19 @@ def main():
     sys.exit(1)
 
   client = gdata.projecthosting.client.ProjectHostingClient()
-  authenticating_client(client, project, username, password)
-  retrieve_all_issues(client, project)
-
+  authenticate_client(client, project_name, username, password)
+  proj = Project(project_name, client)
+  proj.show_all_issues()
+  print ""
+  print "### Now creating an issue:"
+  print ""
+  new_issue = proj.create_issue("TEST yet another issue",
+                                "The summary for the issue we just created.")
+  print ""
+  print "### Now showing issues again:"
+  print ""
+  proj.show_all_issues()
+  # Too bad deleting is only through the UI :-(.
 
 if __name__ == '__main__':
   main()
