@@ -12,12 +12,57 @@ import atom.core
 # For everything else.
 import sys
 import re
+import getopt
 import string
 import xml.sax
 import xml.sax.handler
 
+
+def usage(output_stream=sys.stdout):
+  output_stream.write("TBD\n")
+
+
+def authenticating_client(client, username, password):
+  return client.client_login(username, password,
+                             source='projport', service='code')
+
+
 def main():
-  print "Hello, world!"
+  error_exit  = False
+  username    = None
+  password    = None
+  issues_xml  = None
+
+  try:
+    opts, args = getopt.getopt(sys.argv[1:],
+                               '',
+                               [ "username=",
+                                 "password=",
+                               ])
+  except getopt.GetoptError:
+    sys.stderr.write("Error: problem processing options\n")
+    usage(sys.stderr)
+    sys.exit(1)
+
+  for opt, val in opts:
+    if opt == '--help' or opt == '-h' or opt == '-?':
+      usage()
+      sys.exit(0)
+    elif opt == '--username':
+      username = val
+    elif opt == '--password':
+      password = val
+    else:
+      sys.stderr.write("Error: unrecognized option: '%s'\n" % opt)
+      error_exit = True
+
+  if error_exit:
+    usage(sys.stderr)
+    sys.exit(1)
+
+  client = gdata.projecthosting.client.ProjectHostingClient()
+  authenticating_client(client, username, password)
+
 
 if __name__ == '__main__':
   main()
