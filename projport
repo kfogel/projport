@@ -219,6 +219,59 @@ def date_from_string(s):
 #  </customfields>
 # </item>
 
+
+class IssueComment():
+  """A comment on an Issue.
+  TODO: The current representation is probably biased in favor of JIRA
+  issue comments, since that is the initial implementation.  Please
+  further generalize this class as more issue types are added."""
+  def __init__(self, author_username=None, summary=None, body=None,
+               date_created=None, source_id=None):
+    """
+    AUTHOR_USERNAME is a string or None.
+    SUMMARY is a string or None.
+    BODY is a string or None.
+    DATE_CREATED is a datetime or None.
+    SOURCE_ID is a string or None.
+    """
+    self.author_username = author_username
+    self.summary = summary
+    self.body = body
+    self.date_created = date_created
+    self.source_id = source_id
+
+  def __str__(self):
+    return """Comment by %s (%s, id=%s):
+  %s
+  %s
+
+  """ % (self.author_username, self.date_created,
+         self.source_id, self.summary, self.body)
+
+
+class IssueAttachment():
+  """An attachment on an Issue (or, in the future, on an IssueComment).
+  TODO: Some systems attach attachments to comments, others to the
+  bug itself, and maybe some allow it to both.  Right now, what we
+  support is attachments on the bug itself, because that's what
+  JIRA seems to do."""
+  def __init__(self, source_id=None, filename=None, size=None,
+               username=None, date_created=None):
+    """TODO: document."""
+    self.source_id = source_id
+    self.filename = filename
+    self.size = size
+    self.username = username
+    self.date_created = date_created
+
+  def __str__(self):
+    return """Attachment '%s' uploaded by %s
+  (%d bytes on %s; original id %s)
+
+  """ % (self.filename, self.username,
+         self.size, self.date_created, self.source_id)
+
+
 class Issue():
   def __init__(self,
                summary,                # string: One-liner summary.
@@ -250,9 +303,22 @@ class Issue():
     self.date_last_updated     = date_last_updated
     self.version_filed_against = version_filed_against
     self.version_fixed_for     = version_fixed_for
+    self.comments              = []  # See IssueComment
+    self.attachments           = []  # See IssueAttachment
+
+  def add_comment(self, source_id, author_username, date_created,
+                  summary, body):
+    """Add a comment.  TODO: document, yo."""
+    c = IssueComment(author_username, summary, body, date_created, source_id)
+    self.comments.append(c)
+
+  def add_attachment(self, source_id, filename, size, username, date_created):
+    """Add an attachment.  TODO: document, yo."""
+    a = IssueAttachment(source_id, filename, size, username, date_created)
+    self.attachments.append(a)
 
   def __str__(self):
-    return """Issue %s: %s
+    s = """Issue %s: %s
   %s
   
   Source URL:      %s
@@ -266,7 +332,6 @@ class Issue():
   Fixed in:        %s
   Created:         %s
   Last updated:    %s
-  END ISSUE
 
   """ % (self.source_key,
          self.summary,
@@ -283,6 +348,11 @@ class Issue():
          self.date_created,
          self.date_last_updated,
          )
+    for c in self.comments:
+      s = s + str(c)
+    for a in self.attachments:
+      s = s + str(a)
+    return s
 
 
 def issue_from_jira(jira_xml_obj):
@@ -307,6 +377,17 @@ def issue_from_jira(jira_xml_obj):
                 date_from_string(safe(jira_xml_obj.updated)),
                 safe(jira_xml_obj.version),
                 safe(jira_xml_obj.fixVersion))
+  if jira_xml_obj.comments:
+    comments = jira_xml_obj.comments
+    for c in jira_xml_obj.comments.comment:
+      issue.add_comment(c.id, safe(c.author),
+                        date_from_string(c.created),
+                        None, safe(c.data))
+  if jira_xml_obj.attachments:
+    attachments = jira_xml_obj.attachments
+    for a in jira_xml_obj.attachments.attachment:
+      issue.add_attachment(a.id, safe(a.name), int(a.size),
+                           safe(a.author), date_from_string(a.created))
   return issue
 
 
