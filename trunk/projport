@@ -22,13 +22,20 @@ def usage(output_stream=sys.stdout):
   output_stream.write("TBD\n")
 
 
-def authenticating_client(client, username, password):
-  return client.client_login(username, password,
-                             source='projport', service='code')
+def authenticating_client(client, project, username, password):
+  return client.client_login(username, password, source=project, service='code')
+
+
+def retrieve_all_issues(client, project):
+  """Retrieve all the issues in a project."""
+  feed = client.get_issues(project)
+  for issue in feed.entry:
+    print issue.title.text
 
 
 def main():
   error_exit  = False
+  project     = None
   username    = None
   password    = None
   issues_xml  = None
@@ -36,7 +43,8 @@ def main():
   try:
     opts, args = getopt.getopt(sys.argv[1:],
                                '',
-                               [ "username=",
+                               [ "project=",
+                                 "username=",
                                  "password=",
                                ])
   except getopt.GetoptError:
@@ -48,6 +56,8 @@ def main():
     if opt == '--help' or opt == '-h' or opt == '-?':
       usage()
       sys.exit(0)
+    elif opt == '--project':
+      project = val
     elif opt == '--username':
       username = val
     elif opt == '--password':
@@ -61,7 +71,8 @@ def main():
     sys.exit(1)
 
   client = gdata.projecthosting.client.ProjectHostingClient()
-  authenticating_client(client, username, password)
+  authenticating_client(client, project, username, password)
+  retrieve_all_issues(client, project)
 
 
 if __name__ == '__main__':
