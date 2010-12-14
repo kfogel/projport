@@ -87,10 +87,10 @@ class parse_jira_xml(xml.sax.ContentHandler):
     pass
 
   def startDocument(self):
-    pass;
+    pass
 
   def endDocument(self):
-    pass;
+    pass
 
   def startElement(self, name, attrs):
     if name == 'item':
