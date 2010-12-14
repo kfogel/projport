@@ -1,3 +1,8 @@
+
+http://googlecode.blogspot.com/2009/10/issue-tracker-data-api-for-project.html
+http://code.google.com/p/support/wiki/IssueTrackerAPI
+http://code.google.com/p/support/wiki/IssueTrackerAPIPython
+
 Get Google GData Python API client library:
 
   hg clone https://gdata-python-client.googlecode.com/hg/ gdata-python-client
