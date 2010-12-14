@@ -303,6 +303,7 @@ class Issue():
     self.date_last_updated     = date_last_updated
     self.version_filed_against = version_filed_against
     self.version_fixed_for     = version_fixed_for
+    self.labels                = []  # strings
     self.comments              = []  # See IssueComment
     self.attachments           = []  # See IssueAttachment
 
@@ -316,6 +317,11 @@ class Issue():
     """Add an attachment.  TODO: document, yo."""
     a = IssueAttachment(source_id, filename, size, username, date_created)
     self.attachments.append(a)
+
+  def add_label(self, label):
+    """Add LABEL to this issue iff it's not already on this issue."""
+    if label not in self.labels:
+      self.labels.append(label)
 
   def __str__(self):
     s = """Issue %s: %s
@@ -332,6 +338,7 @@ class Issue():
   Fixed in:        %s
   Created:         %s
   Last updated:    %s
+  Labels:          %s
 
   """ % (self.source_key,
          self.summary,
@@ -347,6 +354,7 @@ class Issue():
          self.version_fixed_for,
          self.date_created,
          self.date_last_updated,
+         ", ".join(self.labels),
          )
     for c in self.comments:
       s = s + str(c)
@@ -377,17 +385,24 @@ def issue_from_jira(jira_xml_obj):
                 date_from_string(safe(jira_xml_obj.updated)),
                 safe(jira_xml_obj.version),
                 safe(jira_xml_obj.fixVersion))
+
+  if jira_xml_obj.customfields:
+    for f in jira_xml_obj.customfields.customfield:
+      if f.key[-7:] == ":labels":
+        # Ignore the 'customfieldvalue', only the name matters.
+        issue.add_label(f.customfieldname)
+
   if jira_xml_obj.comments:
-    comments = jira_xml_obj.comments
     for c in jira_xml_obj.comments.comment:
       issue.add_comment(c.id, safe(c.author),
                         date_from_string(c.created),
                         None, safe(c.data))
+
   if jira_xml_obj.attachments:
-    attachments = jira_xml_obj.attachments
     for a in jira_xml_obj.attachments.attachment:
       issue.add_attachment(a.id, safe(a.name), int(a.size),
                            safe(a.author), date_from_string(a.created))
+
   return issue
 
 
