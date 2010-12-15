@@ -419,9 +419,10 @@ class UserMap():
 
 class Project():
   """A GCH Project, reachable through a client."""
-  def __init__(self, name, client, usermap):
+  def __init__(self, name, client, username, usermap):
     self.name = name
     self.client = client
+    self.username = username
     self.usermap = usermap
     
   def show_all_issues(self):
@@ -429,6 +430,17 @@ class Project():
     feed = self.client.get_issues(self.name)
     for issue in feed.entry:
       print issue.title.text
+
+  def _issue_id_from_atom_id(self, atom_id):
+    """Convert an atom.data.Id representing an issue ID to the ID string."""
+    # TODO: There's got to be an official way to convert an issue ID
+    # object to the issue's ID as a string, since the former is what
+    # gdata client functions return yet the latter is what they take
+    # as parameters.  However, I've been unable to find it, if it exists. 
+    #
+    # "http://code.google.com/feeds/issues/p/projport/issues/full/27"
+    # is the text part of the atom_id; we want the number on the end.
+    return atom_id.text[atom_id.text.rfind('/') + 1:]
 
   def import_issue(self, issue):
     """Import ISSUE into this Google Code Hosting project."""
@@ -445,16 +457,16 @@ class Project():
         issue.description, # our "description" is Google's "summary"
         owner, labels=issue.labels)
       for c in issue.comments:
-        continue # TODO: fooo working here
         comment_owner = self.usermap.get_user(c.author_username)
+        print "KFF: id type", type(gch_issue.id)
+        print "KFF: id raw", gch_issue.id
+        print "KFF: id.text", gch_issue.id.text
+        print "KFF: id", self._issue_id_from_atom_id(gch_issue.id)
         self.client.update_issue(
           self.name,
-          gch_issue.id,
-          comment_owner,
-          comment=c.body,
-          summary=c.summary,
-          status='Accepted',
-          owner=comment_owner,
+          self._issue_id_from_atom_id(gch_issue.id),
+          self.username,
+          comment=c.body
           )
       print "  # Done"
     else:
@@ -536,7 +548,7 @@ def main():
 
   client = gdata.projecthosting.client.ProjectHostingClient()
   authenticate_client(client, project_name, username, password)
-  gch_proj = Project(project_name, client, usermap)
+  gch_proj = Project(project_name, client, username, usermap)
   print "### Showing all issues:"
   gch_proj.show_all_issues()
   print ""
