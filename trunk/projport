@@ -277,7 +277,7 @@ class Issue():
                summary,                # string: One-liner summary.
                description,            # string: Initial description.
                source_link,            # string: URL to original bug.
-               source_key,             # string: Unique id of original bug.
+               source_id,              # string: Unique id of original bug.
                issue_type,             # string: defect / task / enhancement
                priority,               # string: 
                status,                 # string:
@@ -292,7 +292,7 @@ class Issue():
     self.summary               = summary
     self.description           = description
     self.source_link           = source_link
-    self.source_key            = source_key
+    self.source_id             = source_id
     self.issue_type            = issue_type
     self.priority              = priority
     self.status                = status
@@ -340,7 +340,7 @@ class Issue():
   Last updated:    %s
   Labels:          %s
 
-  """ % (self.source_key,
+  """ % (self.source_id,
          self.summary,
          self.description,
          self.source_link,
@@ -406,11 +406,23 @@ def issue_from_jira(jira_xml_obj):
   return issue
 
 
+class UserMap():
+  """TODO: doc"""
+  def __init__(self, userdict):
+    self.userdict = userdict
+  def get_user(self, orig_user):
+    new_user = self.userdict.get(orig_user, None)
+    if new_user is None or new_user == '':
+      new_user = self.userdict.get('')
+    return new_user
+
+
 class Project():
   """A GCH Project, reachable through a client."""
-  def __init__(self, name, client):
+  def __init__(self, name, client, usermap):
     self.name = name
     self.client = client
+    self.usermap = usermap
     
   def show_all_issues(self):
     """Show all the issues in a project."""
@@ -418,15 +430,52 @@ class Project():
     for issue in feed.entry:
       print issue.title.text
 
-  def create_issue(self, title, summary):
-    """Create an issue."""
-    return self.client.add_issue(self.name, title, summary,
-                                 "kfogel@gmail.com", labels=[])
+  def import_issue(self, issue):
+    """Import ISSUE into this Google Code Hosting project."""
+    print "### Creating an issue:"
+    owner = self.usermap.get_user(issue.assignee[1])
+    # See http://code.google.com/p/support/issues/detail?id=4778
+    # for why we trap a particular issue here for now.
+    if issue.source_id.data == "MAD-119":
+      print "  # Creating issue %s" % issue.source_id
+      sys.stdout.flush()
+      gch_issue = self.client.add_issue(
+        self.name, # project name, not issue name
+        issue.summary, # our "summary" is Google's "title"
+        issue.description, # our "description" is Google's "summary"
+        owner, labels=issue.labels)
+      for c in issue.comments:
+        continue # TODO: fooo working here
+        comment_owner = self.usermap.get_user(c.author_username)
+        self.client.update_issue(
+          self.name,
+          gch_issue.id,
+          comment_owner,
+          comment=c.body,
+          summary=c.summary,
+          status='Accepted',
+          owner=comment_owner,
+          )
+      print "  # Done"
+    else:
+      print "  # Faking it for issue %s" % issue.source_id
 
 
 def authenticate_client(client, project, username, password):
   """Authenticate CLIENT to PROJECT, with USERNAME and PASSWORD."""
   client.client_login(username, password, source=project, service='code')
+
+
+def create_usermap(mapfile):
+  f = file(mapfile)
+  line = f.readline().strip()
+  umap = {}
+  while line != '':
+    first_colon = line.find(':')
+    orig, new = line[:first_colon].lstrip(), line[first_colon + 1:].lstrip()
+    umap[orig] = new
+    line = f.readline().strip()
+  return UserMap(umap)
 
 
 def main():
@@ -435,6 +484,10 @@ def main():
   username     = None
   password     = None
   issues_xml   = None
+  # Dictionary mapping old usernames to new identities.  Entry whose
+  # key is empty string is the default, by convention.  Yes, that's
+  # kind of klugey.  Patches welcome.
+  usermap      = None
 
   try:
     opts, args = getopt.getopt(sys.argv[1:],
@@ -442,6 +495,7 @@ def main():
                                [ "project=",
                                  "username=",
                                  "password=",
+                                 "usermap=",
                                  "issues-xml=",   # XML data source file
                                  "issues-type=",  # e.g., "jira", etc.
                                ])
@@ -460,6 +514,8 @@ def main():
       username = val
     elif opt == '--password':
       password = val
+    elif opt == '--usermap':
+      usermap = create_usermap(val)
     elif opt == '--issues-xml':
       issues_xml = file(val)
     elif opt == '--issues-type':
@@ -476,24 +532,12 @@ def main():
     usage(sys.stderr)
     sys.exit(1)
 
-  # client = gdata.projecthosting.client.ProjectHostingClient()
-  # authenticate_client(client, project_name, username, password)
-  # proj = Project(project_name, client)
-  # 
-  # proj.show_all_issues()
-  # 
-  # print ""
-  # print "### Now creating an issue:"
-  # print ""
-  # new_issue = proj.create_issue("TEST yet another issue",
-  #                               "The summary for the issue we just created.")
-  # print ""
-  # print "### Now showing issues again:"
-  # print ""
-  # proj.show_all_issues()
-  # print ""
-  # print "### Now go delete that issue via the UI (since that's the only way)."
-  # print ""
+  client = gdata.projecthosting.client.ProjectHostingClient()
+  authenticate_client(client, project_name, username, password)
+  gch_proj = Project(project_name, client, usermap)
+  print "### Showing all issues:"
+  gch_proj.show_all_issues()
+  print ""
 
   # Try parsing some JIRA XML.
   issues = xml2obj(issues_xml)
@@ -502,7 +546,16 @@ def main():
     issues = issues.channel.item
   for jira_issue in issues:
     issue = issue_from_jira(jira_issue)
-    print issue
+    gch_proj.import_issue(issue)
+
+  print ""
+  print "### Showing all issues again:"
+  print ""
+  gch_proj.show_all_issues()
+  print ""
+  print "### Remember to delete any test issues via the UI."
+  print ""
+
   issues_xml.close()
 
 if __name__ == '__main__':
