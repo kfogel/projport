@@ -282,8 +282,8 @@ class Issue():
                priority,               # string: 
                status,                 # string:
                resolution,             # string:
-               reporter,               # (string, string): realname, username
-               assignee,               # (string, string): realname, username
+               reporter,               # User
+               assignee,               # User
                date_created,           # datetime:
                date_last_updated,      # datetime:
                version_filed_against,  # string:
@@ -307,10 +307,34 @@ class Issue():
     self.comments              = []  # See IssueComment
     self.attachments           = []  # See IssueAttachment
 
+  def _backpointer(self, entity_type, orig_url, orig_author, orig_date):
+    """Return a string describing an original source (e.g., the
+    original issue or original comment from before the conversion).
+    This string is meant to be inserted at the top of an issue
+    description or comment, preceding the original data.
+
+    Arguments:
+    entity_type str What this was (e.g., "issue", "comment", "attachment")
+    orig_url str URL of the original entity
+    orig_author str Name or username of the original author
+    orig_date str Date of the original entity
+    """
+    return """### NOTE: This %s was originally filed by %s on %s, at
+### %s
+### Later it was imported here, but not all of the metadata and formatting were converted -- hence this note.  The original content is below.
+
+""" % (entity_type, orig_author, orig_date, orig_url)
+
+  def add_backpointer(self, orig_str, entity_type,
+                      orig_url, orig_author, orig_date):
+    return self._backpointer(entity_type, orig_url,
+                             orig_author, orig_date) + orig_str
+
   def add_comment(self, source_id, author_username, date_created,
                   summary, body):
     """Add a comment.  TODO: document, yo."""
-    c = IssueComment(author_username, summary, body, date_created, source_id)
+    c = IssueComment(author_username, summary, body,
+                     date_created, source_id)
     self.comments.append(c)
 
   def add_attachment(self, source_id, filename, size, username, date_created):
@@ -344,8 +368,8 @@ class Issue():
          self.summary,
          self.description,
          self.source_link,
-         self.reporter[0], self.reporter[1],
-         self.assignee[0], self.assignee[1],
+         self.reporter,
+         self.assignee,
          self.issue_type,
          self.priority,
          self.status,
@@ -377,10 +401,10 @@ def issue_from_jira(jira_xml_obj):
                 safe(jira_xml_obj.priority),
                 safe(jira_xml_obj.status),
                 safe(jira_xml_obj.resolution),
-                (safe(jira_xml_obj.reporter.data),
-                 safe(jira_xml_obj.reporter.username)),
-                (safe(jira_xml_obj.assignee.data),
-                 safe(jira_xml_obj.assignee.username)),
+                User(jira_xml_obj.reporter.data,
+                     jira_xml_obj.reporter.username),
+                User(jira_xml_obj.assignee.data,
+                     jira_xml_obj.assignee.username),
                 date_from_string(safe(jira_xml_obj.created)),
                 date_from_string(safe(jira_xml_obj.updated)),
                 safe(jira_xml_obj.version),
@@ -406,6 +430,33 @@ def issue_from_jira(jira_xml_obj):
   return issue
 
 
+class User():
+  """A representation of a user who has identities in one or both of
+  the source and dest systems."""
+  def __init__(self, real_name=None, source_username=None,
+               dest_username=None, email_addr=None):
+    # While each arg is optional, they shouldn't all be None in practice.
+    self.real_name = real_name
+    self.source_username = source_username
+    self.dest_username = dest_username
+    self.email_addr = email_addr
+
+  def __str__(self):
+    # TODO: we don't currently include email_addr in the string
+    # representation, but we could if there were some reason to.
+    s = ""
+    if self.real_name:
+      s += "%s (" % self.real_name
+    if self.source_username:
+      s += "%s" % self.source_username
+    if self.source_username and self.dest_username:
+      s += " ==> "
+    if self.dest_username:
+      s += "%s" % self.dest_username
+    if self.real_name:
+      s += ")"
+    return s
+
 class UserMap():
   """TODO: doc"""
   def __init__(self, userdict):
@@ -417,13 +468,17 @@ class UserMap():
     return new_user
 
 
-class Project():
-  """A GCH Project, reachable through a client."""
-  def __init__(self, name, client, username, usermap):
+class GCHProject():
+  """A Google Code Hosting Project, reachable through a client."""
+  def __init__(self, name, client, username, usermap, source_type,
+               issue_link_template=None, issue_comment_link_template=None):
     self.name = name
     self.client = client
     self.username = username
     self.usermap = usermap
+    self.source_type = source_type
+    self.issue_link_template = issue_link_template
+    self.issue_comment_link_template = issue_comment_link_template
     
   def show_all_issues(self):
     """Show all the issues in a project."""
@@ -445,29 +500,38 @@ class Project():
   def import_issue(self, issue):
     """Import ISSUE into this Google Code Hosting project."""
     print "### Creating an issue:"
-    owner = self.usermap.get_user(issue.assignee[1])
+    owner = self.usermap.get_user(issue.assignee.source_username)
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we trap a particular issue here for now.
     if issue.source_id.data == "MAD-119":
       print "  # Creating issue %s" % issue.source_id
       sys.stdout.flush()
+      dest_desc = issue.description
+      if self.source_type == "jira":
+        dest_desc = issue.add_backpointer(
+          dest_desc, "issue", issue.source_link,
+          issue.reporter, issue.date_created)
       gch_issue = self.client.add_issue(
-        self.name, # project name, not issue name
-        issue.summary, # our "summary" is Google's "title"
-        issue.description, # our "description" is Google's "summary"
-        owner, labels=issue.labels)
+        # project name, not issue name
+        self.name,
+        # Google uses "title" for what we call "summary"
+        issue.summary,
+        # Google uses "summary" for what we call "description"
+        dest_desc, owner, labels=issue.labels)
+
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
-        print "KFF: id type", type(gch_issue.id)
-        print "KFF: id raw", gch_issue.id
-        print "KFF: id.text", gch_issue.id.text
-        print "KFF: id", self._issue_id_from_atom_id(gch_issue.id)
+        dest_comment = issue.description
+        if self.source_type == "jira":
+          c_link = c.source_id
+          if self.issue_comment_link_template and issue.source_link:
+            c_link = self.issue_comment_link_template \
+                % (issue.source_link, c.source_id, c.source_id)
+          dest_comment = issue.add_backpointer(
+            c.body, "comment", c_link, c.author_username, c.date_created)
         self.client.update_issue(
-          self.name,
-          self._issue_id_from_atom_id(gch_issue.id),
-          self.username,
-          comment=c.body
-          )
+          self.name, self._issue_id_from_atom_id(gch_issue.id),
+          self.username, comment=dest_comment)
       print "  # Done"
     else:
       print "  # Faking it for issue %s" % issue.source_id
@@ -496,6 +560,27 @@ def main():
   username     = None
   password     = None
   issues_xml   = None
+
+  # Not currently used, because in JIRA issues we already get the
+  # original issue link just fine in the issue.source_link field.
+  issue_link_template = None
+
+  # For JIRA, the issue_comment_link_template looks something like:
+  #
+  #   %s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.\
+  #   issuetabpanels%%3Acomment-tabpanel#action_%s"
+  #
+  # ...where the three "%s" substitutions are:
+  # 
+  #   first %s   ==>  issue.source_link (that is, the issue URL)
+  #   second %s  ==>  comment ID (e.g., "10223")
+  #   third %s   ==>  comment ID (e.g., "10223"), yes, exactly the same
+  #
+  # (Note also the double "%%" in "%%3A"!  Since URI escape syntax and
+  # Python string interpolation syntax both use "%", we have to
+  # meta-escape the former to get correct results from the latter.)
+  issue_comment_link_template = None
+
   # Dictionary mapping old usernames to new identities.  Entry whose
   # key is empty string is the default, by convention.  Yes, that's
   # kind of klugey.  Patches welcome.
@@ -509,7 +594,9 @@ def main():
                                  "password=",
                                  "usermap=",
                                  "issues-xml=",   # XML data source file
-                                 "issues-type=",  # e.g., "jira", etc.
+                                 "source-type=",  # e.g., "jira", etc.
+                                 "issue-link=",
+                                 "issue-comment-link=",
                                ])
   except getopt.GetoptError:
     sys.stderr.write("Error: problem processing options\n")
@@ -532,14 +619,18 @@ def main():
       usermap = create_usermap(val)
     elif opt == '--issues-xml':
       issues_xml = file(val)
-    elif opt == '--issues-type':
-      issues_type = val
+    elif opt == '--source-type':
+      source_type = val
+    elif opt == '--issue-link':
+      issue_link_template = val
+    elif opt == '--issue-comment-link':
+      issue_comment_link_template = val
     else:
       sys.stderr.write("Error: unrecognized option: '%s'\n" % opt)
       error_exit = True
 
-  if issues_type is None or issues_type.lower() not in ("jira"):
-    sys.stderr.write("Error: unrecognized issues type: '%s'\n" % issues_type)
+  if source_type is None or source_type.lower() not in ("jira"):
+    sys.stderr.write("Error: unrecognized issues type: '%s'\n" % source_type)
     error_exit = True
 
   if error_exit:
@@ -548,7 +639,8 @@ def main():
 
   client = gdata.projecthosting.client.ProjectHostingClient()
   authenticate_client(client, project_name, username, password)
-  gch_proj = Project(project_name, client, username, usermap)
+  gch_proj = GCHProject(project_name, client, username, usermap, source_type,
+                        issue_link_template, issue_comment_link_template)
   print "### Showing all issues:"
   gch_proj.show_all_issues()
   print ""

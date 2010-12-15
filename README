@@ -1,11 +1,24 @@
+##########################################################################
+###                                                                    ###
+###   projport: project hosting importer tool (issues only, so far).   ###
+###                                                                    ###
+##########################################################################
+
 Usage:
 
   ./projport --project projport                               \
              --username yourname@gmail.com                    \
              --password yourpass                              \
              --usermap usermap.txt                            \
-             --issues-type jira                               \
-             --issues-xml sampledata/eas-jira-issues-1.xml 
+             --source-type jira                               \
+             --issues-xml sampledata/eas-jira-issues-1.xml    \
+             --issue-comment-link="%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels%%3Acomment-tabpanel#action_%s"
+
+##########################################################################
+###                                                                    ###
+###   The rest of this README is in a state of flux.  Caveat emptor.   ###
+###                                                                    ###
+##########################################################################
 
 Resources:
 
