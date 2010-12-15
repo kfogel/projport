@@ -538,10 +538,6 @@ class GCHProject():
       print "  # Done"
     else:
       print "  # Faking it for issue %s" % issue.source_id
-      for a in issue.attachments:
-        print a
-      for c in issue.comments:
-        print c
 
 
 def authenticate_client(client, project, username, password):
