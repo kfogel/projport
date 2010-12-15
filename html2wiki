@@ -1,0 +1,23 @@
+#!/usr/bin/perl -w
+
+#use lib 'C:/temp/confluence_export/convert/HTML-WikiConverter-0.68/lib/HTML';
+#use lib 'C:/temp/confluence_export/convert/HTML-WikiConverter-0.68/lib/';
+use lib 'C:/temp/confluence_export/convert/HTML-WikiConverter-0.68/';
+
+use strict;
+use File::Find qw(find);
+use HTML::WikiConverter;
+
+sub callback {
+  # Substitute any code here to operate on '$File::Find::name'.
+  print $File::Find::name, "/n";
+  # pull out the source path relative to $ARGV[0]
+  # assemble the target path ($ARGV[1] + relative path)
+  # if the target path is a directory, create the directory
+  # if the target path is a file, write the output file
+  # print $wikiConverter->html2wiki( file => $path, slurp => 1 );
+}
+
+# truncate the target dircetory - $ARGV[1]
+#my $wikiConverter = new HTML::WikiConverter( dialect => 'MoinMoin' );
+find(/&callback, $ARGV[0]);
