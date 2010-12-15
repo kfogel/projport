@@ -513,6 +513,8 @@ def main():
     elif opt == '--username':
       username = val
     elif opt == '--password':
+      # TODO: this should be read in at a non-echo prompt, to avoid a
+      # process listing revealing the password.
       password = val
     elif opt == '--usermap':
       usermap = create_usermap(val)
