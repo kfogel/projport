@@ -547,7 +547,7 @@ class GCHProject():
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we sometimes load only a few issues here.
     def is_testing_issue(issue_id_str):
-      for num in 174, 128, 123, 61, 85:
+      for num in 61, 128, 123: #, 174, 85:
         if issue_id_str == "MAD-%d" % num:
           return True
       return False
@@ -567,8 +567,22 @@ class GCHProject():
         # Note that Google uses "title" for what we call "summary".
         "(%s) %s" % (issue.source_id.data, issue.summary),
         # And Google uses "summary" for what we call "description".
-        dest_desc, owner, owner=owner,
+        dest_desc,
+        # In the source code to add_issue, this parameter is named
+        # "author", but as it happens, we want to pass owner for it
+        # anyway (in online documentation, it is somewhat misleadingly
+        # called "owner" too).
+        owner,
+        # Now the real owner field.  Unfortunately, passing it here
+        # has no effect, and we have to do an additional call to
+        # update_issue() afterwards to actually set the owner.
+        owner=owner,
         status=dest_status, labels=issue.labels)
+      # See http://code.google.com/p/support/issues/detail?id=4790 for
+      # why we have to call update_issue() to set the owner here.
+      gch_issue = self.client.update_issue(
+        self.name, self._issue_id_from_atom_id(gch_issue.id),
+        self.username, owner=owner)
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
         dest_comment = issue.description
