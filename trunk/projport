@@ -504,24 +504,49 @@ class GCHProject():
     """Import ISSUE into this Google Code Hosting project."""
     print "### Creating an issue:"
     owner = self.usermap.get_user(issue.assignee.source_username)
+    print "  # Creating issue %s" % issue.source_id
+    sys.stdout.flush()
+    dest_desc = issue.description
+    dest_status = "New"  # default to something the devs will see
+    if self.source_type == "jira":
+      # Leave a note at the top of the issue's main description,
+      # explaining that this issue was imported from elsewhere.
+      dest_desc = issue.add_backpointer(
+        dest_desc, "issue", issue.source_link,
+        issue.reporter, issue.date_created)
+      # Determine the destination's status/resolution.
+      #
+      # JIRA statuses:    Open, Reopened, Resolved
+      # JIRA resolutions: Unresolved, Fixed, Duplicate, Cannot Reproduce
+      # 
+      # (In JIRA, 'Open' or 'Reopened' status always means 'Unresolved'
+      # resolution, and status 'Resolved' means some other resolution.)
+      #
+      # Google statuses: New, Accepted, Started, [Closed status, see below]
+      #                  Fixed, Verified, Invalid, Duplicate, WontFix, Done
+      #
+      # So we need to fold JIRA's status/resolution combinations into
+      # Google's single status code.  Note that some of the Google
+      # statuses have no JIRA analog, so we'll never generate them
+      # in this converter.
+      if str(issue.status) == "Resolved":
+        if str(issue.resolution) == "Fixed":
+          dest_status = "Fixed"
+        elif str(issue.resolution) == "Duplicate":
+          dest_status = "Duplicate"
+        elif str(issue.resolution) == "Cannot Reproduce":
+          dest_status = "Invalid"
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we trap a particular issue here for now.
     if issue.source_id.data == "MAD-119":
-      print "  # Creating issue %s" % issue.source_id
-      sys.stdout.flush()
-      dest_desc = issue.description
-      if self.source_type == "jira":
-        dest_desc = issue.add_backpointer(
-          dest_desc, "issue", issue.source_link,
-          issue.reporter, issue.date_created)
       gch_issue = self.client.add_issue(
         # project name, not issue name
         self.name,
         # Google uses "title" for what we call "summary"
         issue.summary,
         # Google uses "summary" for what we call "description"
-        dest_desc, owner, labels=issue.labels)
-
+        dest_desc, owner, owner=owner,
+        status=dest_status, labels=issue.labels)
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
         dest_comment = issue.description
@@ -535,9 +560,8 @@ class GCHProject():
         self.client.update_issue(
           self.name, self._issue_id_from_atom_id(gch_issue.id),
           self.username, comment=dest_comment)
-      print "  # Done"
-    else:
-      print "  # Faking it for issue %s" % issue.source_id
+    print "  # Issue %s: (%s/%s => %s)" \
+        % (issue.source_id, issue.status, issue.resolution, dest_status)
 
 
 def authenticate_client(client, project, username, password):
