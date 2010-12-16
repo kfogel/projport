@@ -310,11 +310,6 @@ class Issue():
     self.comments              = []  # See IssueComment
     self.attachments           = []  # See IssueAttachment
 
-    if self.version_filed_against:
-      self.add_label("FoundIn-%s" % self.version_filed_against)
-    if self.version_to_fix_by:
-      self.add_label("FixBy-%s" % self.version_to_fix_by)
-
   def _backpointer(self, entity_type, orig_url, orig_author, orig_date):
     """Return a string describing an original source (e.g., the
     original issue or original comment from before the conversion).
@@ -544,10 +539,46 @@ class GCHProject():
           dest_status = "Duplicate"
         elif str(issue.resolution) == "Cannot Reproduce":
           dest_status = "Invalid"
+      # Translate JIRA priority to Google priority.
+      if issue.priority:
+        # JIRA has five priorities: Blocker, Critical, Major, Minor, Trivial
+        # Google has four priorities: Critical, High, Medium, Low
+        # Translate from the former to the latter as best we can.
+        if (str(issue.priority) == "Blocker" or
+            str(issue.priority) == "Critical"):
+          issue.add_label("Priority-Critical")
+        elif str(issue.priority) == "Major":
+          issue.add_label("Priority-High")
+        elif str(issue.priority) == "Minor":
+          issue.add_label("Priority-Medium")
+        elif str(issue.priority) == "Trivial":
+          issue.add_label("Priority-Low")
+        else:
+          issue.add_label("Priority-Medium")
+      # Translate JIRA type to Google type.
+      if issue.issue_type:
+        # JIRA has four types: Bug, Task, Improvement, New Feature
+        # Google has five types: Defect, Task, Enhancement, Review, Other
+        # Translate from the former to the latter as best we can.
+        if str(issue.issue_type) == "Bug":
+          issue.add_label("Type-Defect")
+        elif str(issue.issue_type) == "Task":
+          issue.add_label("Type-Task")
+        elif (str(issue.issue_type) == "Improvement" or
+              str(issue.issue_type) == "New Feature"):
+          issue.add_label("Type-Enhancement")
+        else:
+          issue.add_label("Type-Other")
+      # Translate JIRA milestone to Google milestone.
+      if issue.version_to_fix_by:
+        issue.add_label("Milestone-%s" % issue.version_to_fix_by)
+      # Translate JIRA version to (our made-up) Google version.
+      if issue.version_filed_against:
+        issue.add_label("FoundIn-%s" % issue.version_filed_against)
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we sometimes load only a few issues here.
     def is_testing_issue(issue_id_str):
-      for num in 61, 128, 123: #, 174, 85:
+      for num in 61, 128, 123, 174, 85:
         if issue_id_str == "MAD-%d" % num:
           return True
       return False
