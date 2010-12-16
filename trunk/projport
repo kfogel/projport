@@ -502,9 +502,7 @@ class GCHProject():
 
   def import_issue(self, issue):
     """Import ISSUE into this Google Code Hosting project."""
-    print "### Creating an issue:"
     owner = self.usermap.get_user(issue.assignee.source_username)
-    print "  # Creating issue %s" % issue.source_id
     sys.stdout.flush()
     dest_desc = issue.description
     dest_status = "New"  # default to something the devs will see
