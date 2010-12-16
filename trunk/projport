@@ -556,9 +556,17 @@ class GCHProject():
       gch_issue = self.client.add_issue(
         # project name, not issue name
         self.name,
-        # Google uses "title" for what we call "summary"
+        # We prepend the original issue's id to that title for
+        # historical traceability.  Even better would be to actually
+        # convert the links between issues to point to the new ones,
+        # and it's perfectly possible to do so, but it's a lot easier
+        # just to stick the original id in the title and let humans do
+        # the searching on the rare occasions when they need to trace
+        # back and forth between issues.
+        #
+        # Note that Google uses "title" for what we call "summary".
         "(%s) %s" % (issue.source_id.data, issue.summary),
-        # Google uses "summary" for what we call "description"
+        # And Google uses "summary" for what we call "description".
         dest_desc, owner, owner=owner,
         status=dest_status, labels=issue.labels)
       for c in issue.comments:
