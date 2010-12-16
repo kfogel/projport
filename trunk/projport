@@ -647,6 +647,7 @@ class GCHProject():
         self.name, gch_issue_id_str, self.username, owner=owner)
       # Record the old->new issue mapping.
       self.issues_translation_table[gch_issue_id_str] = issue.source_id.data
+      # Send comments.
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
         dest_comment = issue.description
