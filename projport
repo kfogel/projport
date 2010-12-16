@@ -14,6 +14,7 @@ import sys
 import re
 import getopt
 import string
+import time
 import datetime
 import xml.sax
 import xml.sax.handler
@@ -289,7 +290,7 @@ class Issue():
                date_created,           # datetime:
                date_last_updated,      # datetime:
                version_filed_against,  # string:
-               version_fixed_for,      # string:
+               version_to_fix_by,      # string:
                ):
     self.summary               = summary
     self.description           = description
@@ -304,10 +305,15 @@ class Issue():
     self.date_created          = date_created
     self.date_last_updated     = date_last_updated
     self.version_filed_against = version_filed_against
-    self.version_fixed_for     = version_fixed_for
+    self.version_to_fix_by     = version_to_fix_by
     self.labels                = []  # strings
     self.comments              = []  # See IssueComment
     self.attachments           = []  # See IssueAttachment
+
+    if self.version_filed_against:
+      self.add_label("FoundIn-%s" % self.version_filed_against)
+    if self.version_to_fix_by:
+      self.add_label("FixBy-%s" % self.version_to_fix_by)
 
   def _backpointer(self, entity_type, orig_url, orig_author, orig_date):
     """Return a string describing an original source (e.g., the
@@ -378,7 +384,7 @@ class Issue():
          self.status,
          self.resolution,
          self.version_filed_against,
-         self.version_fixed_for,
+         self.version_to_fix_by,
          self.date_created,
          self.date_last_updated,
          ", ".join(self.labels),
@@ -413,11 +419,15 @@ def issue_from_jira(jira_xml_obj):
                 safe(jira_xml_obj.version),
                 safe(jira_xml_obj.fixVersion))
 
-  if jira_xml_obj.customfields:
-    for f in jira_xml_obj.customfields.customfield:
-      if f.key[-7:] == ":labels":
-        # Ignore the 'customfieldvalue', only the name matters.
-        issue.add_label(f.customfieldname)
+  # Even though it at first looks like the JIRA <customfieldname> and
+  # <customfieldvalue> elements might be sort of like Google Code's
+  # "labels", it appears they aren't.  For now, just ignore them.
+  # 
+  # if jira_xml_obj.customfields:
+  #   for f in jira_xml_obj.customfields.customfield:
+  #     if f.key[-7:] == ":labels":
+  #       # Ignore the 'customfieldvalue', only the name matters.
+  #       issue.add_label(f.customfieldname)
 
   if jira_xml_obj.comments:
     for c in jira_xml_obj.comments.comment:
@@ -535,8 +545,9 @@ class GCHProject():
         elif str(issue.resolution) == "Cannot Reproduce":
           dest_status = "Invalid"
     # See http://code.google.com/p/support/issues/detail?id=4778
-    # for why we trap a particular issue here for now.
-    if issue.source_id.data == "MAD-119":
+    # for why we sometimes trap a particular issue here.
+    # if True:
+    if issue.source_id.data == "MAD-123":
       gch_issue = self.client.add_issue(
         # project name, not issue name
         self.name,
