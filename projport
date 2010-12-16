@@ -558,7 +558,7 @@ class GCHProject():
         self.client.update_issue(
           self.name, self._issue_id_from_atom_id(gch_issue.id),
           self.username, comment=dest_comment)
-    print "  # Issue %s: (%s/%s => %s)" \
+    print "Issue %s: (%s/%s => %s)" \
         % (issue.source_id, issue.status, issue.resolution, dest_status)
 
 
