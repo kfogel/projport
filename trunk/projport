@@ -806,9 +806,8 @@ def main():
       print "Skipping %s" % issue.source_id
     else:
       gch_issue = gch_proj.import_issue(issue)
-      print "%s => GCH %s (%s/%s => %s)" \
-          % (issue.source_id, gch_proj.issue_id_from_atom_id(gch_issue.id),
-             issue.status, issue.resolution, dest_status)
+      print "%s => GCH %s" \
+          % (issue.source_id, gch_proj.issue_id_from_atom_id(gch_issue.id))
 
   issues_xml.close()
 
