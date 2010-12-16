@@ -6,7 +6,7 @@
 
 Usage:
 
-  ./projport --project projport                               \
+  ./projport --project projport-test                          \
              --username yourname@gmail.com                    \
              --password yourpass                              \
              --usermap usermap.txt                            \
