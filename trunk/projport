@@ -393,26 +393,28 @@ class Issue():
 
 def issue_from_jira(jira_xml_obj):
   """Return a generic Issue object based on JIRA_XML_OBJ."""
-  def safe(stringthing):
-    if isinstance(stringthing, basestring): # TODO: Or ask if unicode?
-      return stringthing.encode('ascii', 'xmlcharrefreplace')
-    return stringthing
-  issue = Issue(safe(jira_xml_obj.summary),
-                safe(jira_xml_obj.description),
-                safe(jira_xml_obj.link),
-                safe(jira_xml_obj.key),
-                safe(jira_xml_obj.type),
-                safe(jira_xml_obj.priority),
-                safe(jira_xml_obj.status),
-                safe(jira_xml_obj.resolution),
-                User(jira_xml_obj.reporter.data,
-                     jira_xml_obj.reporter.username),
-                User(jira_xml_obj.assignee.data,
-                     jira_xml_obj.assignee.username),
-                date_from_string(safe(jira_xml_obj.created)),
-                date_from_string(safe(jira_xml_obj.updated)),
-                safe(jira_xml_obj.version),
-                safe(jira_xml_obj.fixVersion))
+  def safely_stringize(thing):
+    if hasattr(thing, 'data'):
+      thing = thing.data
+    if isinstance(thing, basestring): # TODO: Or ask if unicode?
+      return thing.encode('ascii', 'xmlcharrefreplace')
+    return thing
+  issue = Issue(safely_stringize(jira_xml_obj.summary),
+                safely_stringize(jira_xml_obj.description),
+                safely_stringize(jira_xml_obj.link),
+                safely_stringize(jira_xml_obj.key),
+                safely_stringize(jira_xml_obj.type),
+                safely_stringize(jira_xml_obj.priority),
+                safely_stringize(jira_xml_obj.status),
+                safely_stringize(jira_xml_obj.resolution),
+                User(safely_stringize(jira_xml_obj.reporter),
+                     safely_stringize(jira_xml_obj.reporter.username)),
+                User(safely_stringize(jira_xml_obj.assignee),
+                     safely_stringize(jira_xml_obj.assignee.username)),
+                date_from_string(safely_stringize(jira_xml_obj.created)),
+                date_from_string(safely_stringize(jira_xml_obj.updated)),
+                safely_stringize(jira_xml_obj.version),
+                safely_stringize(jira_xml_obj.fixVersion))
 
   # Even though it at first looks like the JIRA <customfieldname> and
   # <customfieldvalue> elements might be sort of like Google Code's
@@ -426,14 +428,15 @@ def issue_from_jira(jira_xml_obj):
 
   if jira_xml_obj.comments:
     for c in jira_xml_obj.comments.comment:
-      issue.add_comment(c.id, safe(c.author),
+      issue.add_comment(c.id, safely_stringize(c.author),
                         date_from_string(c.created),
-                        None, safe(c.data))
+                        None, safely_stringize(c))
 
   if jira_xml_obj.attachments:
     for a in jira_xml_obj.attachments.attachment:
-      issue.add_attachment(a.id, safe(a.name), int(a.size),
-                           safe(a.author), date_from_string(a.created))
+      issue.add_attachment(a.id, safely_stringize(a.name), int(a.size),
+                           safely_stringize(a.author),
+                           date_from_string(a.created))
 
   return issue
 
@@ -497,7 +500,7 @@ class GCHProject():
     for issue in feed.entry:
       print issue.title.text
 
-  def _issue_id_from_atom_id(self, atom_id):
+  def issue_id_from_atom_id(self, atom_id):
     """Convert an atom.data.Id representing an issue ID to the ID string."""
     # TODO: There's got to be an official way to convert an issue ID
     # object to the issue's ID as a string, since the former is what
@@ -509,7 +512,9 @@ class GCHProject():
     return atom_id.text[atom_id.text.rfind('/') + 1:]
 
   def import_issue(self, issue):
-    """Import ISSUE into this Google Code Hosting project."""
+    """Import ISSUE into this Google Code Hosting project.
+    Return the Google Code Hosting issue thus created."""
+    gch_issue = None
     owner = self.usermap.get_user(issue.assignee.source_username)
     sys.stdout.flush()
     dest_desc = issue.description
@@ -616,7 +621,7 @@ class GCHProject():
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we sometimes load only a few issues here.
     # 
-    # if is_testing_issue(issue.source_id.data):
+    # if is_testing_issue(issue.source_id):
     if True:
       gch_issue = self.client.add_issue(
         # project name, not issue name
@@ -630,7 +635,7 @@ class GCHProject():
         # back and forth between issues.
         #
         # Note that Google uses "title" for what we call "summary".
-        "(%s) %s" % (issue.source_id.data, issue.summary),
+        "(%s) %s" % (issue.source_id, issue.summary),
         # And Google uses "summary" for what we call "description".
         dest_desc,
         # In the source code to add_issue, this parameter is named
@@ -643,13 +648,13 @@ class GCHProject():
         # update_issue() afterwards to actually set the owner.
         owner=owner,
         status=dest_status, labels=issue.labels)
-      gch_issue_id_str = self._issue_id_from_atom_id(gch_issue.id)
+      gch_issue_id_str = self.issue_id_from_atom_id(gch_issue.id)
       # See http://code.google.com/p/support/issues/detail?id=4790 for
       # why we have to call update_issue() to set the owner here.
       gch_issue = self.client.update_issue(
         self.name, gch_issue_id_str, self.username, owner=owner)
       # Record the old->new issue mapping.
-      self.issues_translation_table[gch_issue_id_str] = issue.source_id.data
+      self.issues_translation_table[issue.source_id] = gch_issue_id_str
       # Send comments.
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
@@ -663,9 +668,7 @@ class GCHProject():
             c.body, "comment", c_link, c.author_username, c.date_created)
         self.client.update_issue(
           self.name, gch_issue_id_str, self.username, comment=dest_comment)
-      print "MAD-%s => GCH %s (%s/%s => %s)" \
-          % (issue.source_id, gch_issue_id_str,
-             issue.status, issue.resolution, dest_status)
+    return gch_issue
 
 
 def authenticate_client(client, project, username, password):
@@ -673,8 +676,22 @@ def authenticate_client(client, project, username, password):
   client.client_login(username, password, source=project, service='code')
 
 
+def file_to_list(f):
+  """Create a list of strings from F, where each line becomes one element.
+  Leading and trailing whitespace (including the newline) are removed."""
+  handle = file(f)
+  lst = []
+  line = handle.readline()
+  while line != '':
+    lst.append(line.strip())
+    line = handle.readline()
+  return lst
+  
+
 def create_usermap(mapfile):
   f = file(mapfile)
+  # TODO: Oh, wait, strip()ing here means any blank line in the file
+  # will end the loop.  That seems dumb.
   line = f.readline().strip()
   umap = {}
   while line != '':
@@ -691,6 +708,7 @@ def main():
   username     = None
   password     = None
   issues_xml   = None
+  done_issues  = None
 
   # Not currently used, because in JIRA issues we already get the
   # original issue link just fine in the issue.source_link field.
@@ -729,6 +747,7 @@ def main():
                                  "source-type=",  # e.g., "jira", etc.
                                  "issue-link=",
                                  "issue-comment-link=",
+                                 "done-issues=",
                                ])
   except getopt.GetoptError as e:
     sys.stderr.write("Error: problem processing options: %s\n" % e)
@@ -757,6 +776,8 @@ def main():
       issue_link_template = val
     elif opt == '--issue-comment-link':
       issue_comment_link_template = val
+    elif opt == '--done-issues':
+      done_issues = file_to_list(val)
     else:
       sys.stderr.write("Error: unrecognized option: '%s'\n" % opt)
       error_exit = True
@@ -773,9 +794,6 @@ def main():
   authenticate_client(client, project_name, username, password)
   gch_proj = GCHProject(project_name, client, username, usermap, source_type,
                         issue_link_template, issue_comment_link_template)
-  print "### Showing all issues:"
-  gch_proj.show_all_issues()
-  print ""
 
   # Try parsing some JIRA XML.
   issues = xml2obj(issues_xml)
@@ -784,19 +802,13 @@ def main():
     issues = issues.channel.item
   for jira_issue in issues:
     issue = issue_from_jira(jira_issue)
-    gch_proj.import_issue(issue)
-
-  # # TODO: use this to see the old->new mapping if you want.
-  # for k in gch_proj.issues_translation_table.keys():
-  #   print "# KFF: %s  ==>  %s" % (k, gch_proj.issues_translation_table[k]) 
-
-  print ""
-  print "### Showing all issues again:"
-  print ""
-  gch_proj.show_all_issues()
-  print ""
-  print "### Remember to delete any test issues via the UI."
-  print ""
+    if issue.source_id in done_issues:
+      print "Skipping %s" % issue.source_id
+    else:
+      gch_issue = gch_proj.import_issue(issue)
+      print "%s => GCH %s (%s/%s => %s)" \
+          % (issue.source_id, gch_proj.issue_id_from_atom_id(gch_issue.id),
+             issue.status, issue.resolution, dest_status)
 
   issues_xml.close()
 
