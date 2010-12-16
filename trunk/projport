@@ -487,6 +487,9 @@ class GCHProject():
     self.source_type = source_type
     self.issue_link_template = issue_link_template
     self.issue_comment_link_template = issue_comment_link_template
+    # A dictionary mapping issue ids from the old tracker to issue ids
+    # in the new tracker.  See self._translate_issue_ids().
+    self.issues_translation_table = {}
     
   def show_all_issues(self):
     """Show all the issues in a project."""
@@ -575,10 +578,38 @@ class GCHProject():
       # Translate JIRA version to (our made-up) Google version.
       if issue.version_filed_against:
         issue.add_label("FoundIn-%s" % issue.version_filed_against)
+
+    def _translate_issue_ids(self, desc_or_comment):
+      """Append to DESC_OR_COMMENT a note showing the mapping between
+      issue ids from the original tracker mentioned in DESC_OR_COMMENT
+      and issue ids in the new tracker.  This is to enable users to
+      still follow links between issues even after switching trackers.
+
+      It would be even better to directly translate the links
+      themselves.  However, unfortunately they are often given in
+      inconsistent formats -- sometimes as a full URL, other times as
+      a special string that the original tracker knows how to expand,
+      e.g., "MAD-123".  The workaround is to simply find all the (unique)
+      occurrences of "MAD-[0-9]+" in the original DESC_OR_COMMENT, and
+      then append a note showing their ids in the new tracker, e.g.:
+
+         ### NOTE: The old issue ids mentioned in this comment map to
+         ### new issue ids in the following way:
+         ###
+         ###    MAP-61   ==>  issue #70
+         ###    MAP-123  ==>  issue #152
+         ###    MAP-125  ==>  issue #154
+      
+      That is a lot easier to implement, and just about as useful.
+
+      See self.issues_translation_table."""
+      # TODO: haven't actually implemented this yet.  Pity.
+      pass
+
     # See http://code.google.com/p/support/issues/detail?id=4778
     # for why we sometimes load only a few issues here.
     def is_testing_issue(issue_id_str):
-      for num in 61, 128, 123, 174, 85:
+      for num in 61, 128,: # 123, 165, 174, 85:
         if issue_id_str == "MAD-%d" % num:
           return True
       return False
@@ -609,11 +640,13 @@ class GCHProject():
         # update_issue() afterwards to actually set the owner.
         owner=owner,
         status=dest_status, labels=issue.labels)
+      gch_issue_id_str = self._issue_id_from_atom_id(gch_issue.id)
       # See http://code.google.com/p/support/issues/detail?id=4790 for
       # why we have to call update_issue() to set the owner here.
       gch_issue = self.client.update_issue(
-        self.name, self._issue_id_from_atom_id(gch_issue.id),
-        self.username, owner=owner)
+        self.name, gch_issue_id_str, self.username, owner=owner)
+      # Record the old->new issue mapping.
+      self.issues_translation_table[gch_issue_id_str] = issue.source_id.data
       for c in issue.comments:
         comment_owner = self.usermap.get_user(c.author_username)
         dest_comment = issue.description
@@ -625,8 +658,7 @@ class GCHProject():
           dest_comment = issue.add_backpointer(
             c.body, "comment", c_link, c.author_username, c.date_created)
         self.client.update_issue(
-          self.name, self._issue_id_from_atom_id(gch_issue.id),
-          self.username, comment=dest_comment)
+          self.name, gch_issue_id_str, self.username, comment=dest_comment)
     print "Issue %s: (%s/%s => %s)" \
         % (issue.source_id, issue.status, issue.resolution, dest_status)
 
@@ -747,6 +779,10 @@ def main():
   for jira_issue in issues:
     issue = issue_from_jira(jira_issue)
     gch_proj.import_issue(issue)
+
+  # # TODO: use this to see the old->new mapping if you want.
+  # for k in gch_proj.issues_translation_table.keys():
+  #   print "# KFF: %s  ==>  %s" % (k, gch_proj.issues_translation_table[k]) 
 
   print ""
   print "### Showing all issues again:"
