@@ -545,14 +545,19 @@ class GCHProject():
         elif str(issue.resolution) == "Cannot Reproduce":
           dest_status = "Invalid"
     # See http://code.google.com/p/support/issues/detail?id=4778
-    # for why we sometimes trap a particular issue here.
+    # for why we sometimes load only a few issues here.
+    def is_testing_issue(issue_id_str):
+      for num in 174, 128, 123, 61, 85:
+        if issue_id_str == "MAD-%d" % num:
+          return True
+      return False
     # if True:
-    if issue.source_id.data == "MAD-123":
+    if is_testing_issue(issue.source_id.data):
       gch_issue = self.client.add_issue(
         # project name, not issue name
         self.name,
         # Google uses "title" for what we call "summary"
-        issue.summary,
+        "(%s) %s" % (issue.source_id.data, issue.summary),
         # Google uses "summary" for what we call "description"
         dest_desc, owner, owner=owner,
         status=dest_status, labels=issue.labels)
