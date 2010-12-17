@@ -41,7 +41,7 @@ Usage:
              --source-type jira                               \\
              --done-issues done-issues.txt                    \\
              --issues-xml sampledata/eas-jira-issues-1.xml    \\
-             --issue-comment-link "%%s?focusedCommentId=%%s&page=com.atlassian.jira.plugin.system.issuetabpanels%%%%3Acomment-tabpanel#action_%%s"
+             --issue-comment-link "%s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.issuetabpanels%%3Acomment-tabpanel#action_%s"
 """
 
   details_block = """\
