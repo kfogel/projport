@@ -651,7 +651,7 @@ class GCHProject():
       gch_issue_id_str = self.issue_id_from_atom_id(gch_issue.id)
       # See http://code.google.com/p/support/issues/detail?id=4790 for
       # why we have to call update_issue() to set the owner here.
-      gch_issue = self.client.update_issue(
+      self.client.update_issue(
         self.name, gch_issue_id_str, self.username, owner=owner)
       # Record the old->new issue mapping.
       self.issues_translation_table[issue.source_id] = gch_issue_id_str
@@ -805,8 +805,9 @@ def main():
     if issue.source_id in done_issues:
       print "Skipping %s" % issue.source_id
     else:
+      print "Starting source issue %s..." % issue.source_id
       gch_issue = gch_proj.import_issue(issue)
-      print "%s => GCH %s" \
+      print "Finished: %s => GCH %s" \
           % (issue.source_id, gch_proj.issue_id_from_atom_id(gch_issue.id))
 
   issues_xml.close()
