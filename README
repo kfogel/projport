@@ -14,6 +14,8 @@ Usage:
   it only knows how to convert JIRA issues (in XML format) to Google
   Code Hosting issues (via network API calls).
 
+  There's some other stuff in this directory, like 'html2wiki', that's
+
 Installation:
 =============
 
