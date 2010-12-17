@@ -15,6 +15,8 @@ Usage:
   Code Hosting issues (via network API calls).
 
   There's some other stuff in this directory, like 'html2wiki', that's
+  very much work-in-progress.  Just ignore it (unless you want to work
+  on it).  When it's ready for use, this README will say so.
 
 Installation:
 =============
