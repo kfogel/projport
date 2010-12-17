@@ -1,0 +1,98 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+    <head>
+        <title>Enterprise Addressing System : 3tera Change Control Procedures</title>
+	    <link rel="stylesheet" href="styles/site.css" type="text/css" />
+        <META http-equiv="Content-Type" content="text/html; charset=UTF-8">	    
+    </head>
+
+    <body>
+	    <table class="pagecontent" border="0" cellpadding="0" cellspacing="0" width="100%" bgcolor="#ffffff">
+		    <tr>
+			    <td valign="top" class="pagebody">
+				    <div class="pageheader">
+					    <span class="pagetitle">
+                            Enterprise Addressing System : 3tera Change Control Procedures
+                                                    </span>
+				    </div>
+				    <div class="pagesubheading">
+					    This page last changed on Nov 09, 2010 by <font color="#0050B2">pmccullough</font>.
+				    </div>
+
+				    <h1><a name="3teraChangeControlProcedures-3teraChangeControlProcedures"></a>3tera Change Control Procedures</h1>
+
+<p>The following procedures are intended to help facilitate high availability and recoverability from problems that may arise from a scheduled change to an application.</p>
+
+<hr />
+<h1><a name="3teraChangeControlProcedures-3teraNomenclature"></a>3tera Nomenclature</h1>
+
+<p>3tera virtual servers are called "appliances".&nbsp; Appliances can serve as application servers, such as WEB or database servers, or can serve as infrastructure components, such as port forwarding switches or firewalls.</p>
+
+<p>A 3tera catalog contains a list of functional application or infrastructure appliances.&nbsp; When one uses an appliance from a 3tera catalog, it is in an "unbranched" state. &nbsp;It is "linked" and controlled by the catalog.&nbsp; If the appliance in the catalog is updated, that update is propagated to other "unbranched" appliances based on that appliance.</p>
+
+<p>An application is a group of appliances that are functionally linked to provide application services, such as an AJAX stack or standard 3-tier application comprised of WEB and database services.</p>
+
+<p>When an application is copied, migrated&nbsp;or&nbsp;catalog updated, the boot partitions of unbranched appliances are recreated, referencing back to whats most current in the catalog.&nbsp; Configuration changes to unbranched appliances are modified through their respective property pages via the Applogic interface.&nbsp; For instance, basic Apache settings are changed via attributes in the properties sheet of the WEB5 appliance in Applogic.&nbsp; These attributes are applied in unbranched appliances, even when boot partitions are recreated, so this configuration information is not lost when copying or migrating applications or appliances.&nbsp;The relationship between 3tera catalog and unbranched appliance is severed by "branching" an appliance.&nbsp;&nbsp;Any configuration changes made to the boot partition of an unbranched appliance is at risk.</p>
+
+<h2><a name="3teraChangeControlProcedures-Morecontentonbestpracticesina3teraenvironment."></a>More content on best practices in a 3tera environment.</h2>
+
+<hr />
+<h1><a name="3teraChangeControlProcedures-Staffing"></a>Staffing</h1>
+
+<p>During a scheduled change the following personnel are on call to respond to issues requiring escalation and resolution...</p>
+
+<ol>
+	<li>Operational system administrator</li>
+	<li>Application developer/programmer</li>
+	<li>Application manager</li>
+</ol>
+
+
+<p>Contact information is exchanged or made available to all principle parties.</p>
+
+<h1><a name="3teraChangeControlProcedures-Planning"></a>Planning</h1>
+
+<p>A written&nbsp;change control will be submitted via STAMP which will include a &nbsp;"back out" plan that is also provided to all principles and formal review between all parties is conducted and validated.</p>
+
+<p>If the application&nbsp;services a client department, a designated representative of the client department is to be given the contact information of the application manager for purposes of scheduled or non-scheduled event notification.&nbsp; Once a non-disruptive time is&nbsp;negotiated, the DT division head is to be notified via e-mail, verbally if possible, and announcement made in the weekly division meeting.</p>
+
+<h1><a name="3teraChangeControlProcedures-Backup%26Restoration"></a>Backup &amp; Restoration</h1>
+
+<p>Each application is to have an associated Wiki page detailing the customizations done to specific configuration files and the location of these configuration files.&nbsp; This is a requirement&nbsp;when making&nbsp;changes to configuration file/s on&nbsp;<b>unbranched</b> appliances.&nbsp; (See Best Practices above.) Unbranched Appliances  h2. For each application, any configuration changes to unbranched appliances will have a section pertaining to the location, name, and customization of the configuration file.</p>
+
+<p>For example, for Wiki page "3tera - wordpress_mayor (grid sfgov1)" a section appears as...<br/>
+File: /etc/.../asdf.conf<br/>
+Add:<br/>
+Change:</p>
+
+<p>Copy pertinent config files of unbranched appliances to subdirectories on the shared NAS repository in the application named "Repository" under the following directory structure...</p>
+
+<p>/app_name/appliance_name/source_dir_path/config_file Application Backup Copy</p>
+<div class="panel" style="border-width: 1px;"><div class="panelContent">
+<h2><a name="3teraChangeControlProcedures-Forcriticalapplication%2Ctheapplicationmanagermaychoosetohaveafunctionalbackupcopyoftheapplication.%26nbsp%3BPleasenotethatwhencopyingormigratinganapplication%2Cbootvolumesofunbranchedappliancesarerecreated...."></a>For critical application, the application manager may choose to have a functional backup copy of the application.&nbsp; Please note that when copying or migrating an application, boot volumes of unbranched appliances are re-created.&nbsp; Data and configuration changes on these volumes is not migrated or copied.&nbsp; Application staff are to ensure backup copies are operational by applying and testing copied/migrated applications at least 24 hours prior to the change control.&nbsp; If a test of the backup copy is not successfully completed within 24 hours of the change control, the change control is to be rescheduled until&nbsp;testing criteria is met and a successful test of the backup application is completed.</h2>
+</div></div>
+
+<h1><a name="3teraChangeControlProcedures-Notification"></a>Notification</h1>
+
+<p>In the event of an unscheduled outage or delay in timeline:</p>
+
+<p>Contact the Application Manager. The Application Manager may choose to contact the Division Head or customer contact based on the severity on the issue, and has sole discretion to do so.</p>
+
+<p>In the event of a successful scheduled change:</p>
+
+<p>Send txt or e-mail to staff assigned to execute or monitor the change, including the Application Manager.</p>
+
+				    
+                    			    </td>
+		    </tr>
+	    </table>
+	    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+			<tr>
+				<td height="12" background="http://sfgovdt.jira.com/wiki/images/border/border_bottom.gif"><img src="images/border/spacer.gif" width="1" height="1" border="0"/></td>
+			</tr>
+		    <tr>
+			    <td align="center"><font color="grey">Document generated by Confluence on Dec 15, 2010 12:39</font></td>
+		    </tr>
+	    </table>
+    </body>
+</html>

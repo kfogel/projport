@@ -1,0 +1,820 @@
+#!/usr/bin/python
+
+# For Google Code Hosting.
+import gdata.projecthosting.client
+import gdata.projecthosting.data
+import gdata.gauth
+import gdata.client
+import gdata.data
+import atom.http_core
+import atom.core
+
+# For everything else.
+import sys
+import re
+import getopt
+import string
+import time
+import datetime
+import xml.sax
+import xml.sax.handler
+
+def usage(output_stream=sys.stdout):
+  output_stream.write("TBD\n")
+
+#########################################################################
+###
+### This bit of code is from Wai Yip Tung, see the original at:
+###
+### http://code.activestate.com/recipes/534109-xml-to-python-data-structure/
+###
+### He clearly intended it to be open source, even though he didn't
+### put an explicit license on it.  His documentation and comments
+### make that clear:
+###
+###   To access its data, you can do the following:
+###   
+###   person.gender        -> 'm'     # an attribute
+###   person['gender']     -> 'm'     # alternative dictionary syntax
+###   person.name          -> 'fred'  # shortcut to a text node
+###   person.phone[0].type -> 'home'  # multiple elements becomes an list
+###   person.phone[0].data -> '54321' # use .data to get the text value
+###   str(person.phone[0]) -> '54321' # alternative syntax for the text value
+###   person[0]            -> person  # if only one <person>, it can still
+###                                   # be used as if it's a list of 1 elt.
+###   'address' in person  -> False   # test for existence of an attr or child
+###   person.address       -> None    # non-exist element returns None
+###   bool(person.address) -> False   # has any 'address' data
+###                                   # (attr, child or text)
+###   person.note          -> '"A <note>"'
+###   
+###   This function is inspired by David Mertz' Gnosis objectify
+###   utilities. The motivation of writing this recipe is for
+###   simplicity. With just 100 lines of code packaged into a single
+###   function, it can easily be embedded with other code for ease of
+###   distribution.
+###
+#########################################################################
+
+def xml2obj(src):
+    """A simple function to convert XML data into a native Python object."""
+
+    non_id_char = re.compile('[^_0-9a-zA-Z]')
+    def _name_mangle(name):
+        return non_id_char.sub('_', name)
+
+    class DataNode(object):
+        def __init__(self):
+            self._attrs = {}    # XML attributes and child elements
+            self.data = None    # child text data
+        def __len__(self):
+            # treat single element as a list of 1
+            return 1
+        def __getitem__(self, key):
+            if isinstance(key, basestring):
+                return self._attrs.get(key,None)
+            else:
+                return [self][key]
+        def __contains__(self, name):
+            return self._attrs.has_key(name)
+        def __nonzero__(self):
+            return bool(self._attrs or self.data)
+        def __getattr__(self, name):
+            if name.startswith('__'):
+                # need to do this for Python special methods???
+                raise AttributeError(name)
+            return self._attrs.get(name,None)
+        def _add_xml_attr(self, name, value):
+            if name in self._attrs:
+                # multiple attribute of the same name are represented by a list
+                children = self._attrs[name]
+                if not isinstance(children, list):
+                    children = [children]
+                    self._attrs[name] = children
+                children.append(value)
+            else:
+                self._attrs[name] = value
+        def __str__(self):
+            return self.data or ''
+        def __repr__(self):
+            items = sorted(self._attrs.items())
+            if self.data:
+                items.append(('data', self.data))
+            return u'{%s}' % ', '.join([u'%s:%s' % (k,repr(v)) for k,v in items])
+
+    class TreeBuilder(xml.sax.handler.ContentHandler):
+        def __init__(self):
+            self.stack = []
+            self.root = DataNode()
+            self.current = self.root
+            self.text_parts = []
+        def startElement(self, name, attrs):
+            self.stack.append((self.current, self.text_parts))
+            self.current = DataNode()
+            self.text_parts = []
+            # xml attributes --> python attributes
+            for k, v in attrs.items():
+                self.current._add_xml_attr(_name_mangle(k), v)
+        def endElement(self, name):
+            text = ''.join(self.text_parts).strip()
+            if text:
+                self.current.data = text
+            if self.current._attrs:
+                obj = self.current
+            else:
+                # a text only node is simply represented by the string
+                obj = text or ''
+            self.current, self.text_parts = self.stack.pop()
+            self.current._add_xml_attr(_name_mangle(name), obj)
+        def characters(self, content):
+            self.text_parts.append(content)
+
+    builder = TreeBuilder()
+    if isinstance(src,basestring):
+        xml.sax.parseString(src, builder)
+    else:
+        xml.sax.parse(src, builder)
+    return builder.root._attrs.values()[0]
+
+#########################################################################
+###
+### End section of code by Wai Yip Tung.
+###
+#########################################################################
+
+
+#########################################################################
+# See http://bugs.python.org/issue6641 about how the "%z" timezone
+# offset handling is broken, which is we we write the logic by hand
+# below.  See also http://stackoverflow.com/questions/3286817/\
+# convert-string-timestamp-with-timezone-offset-to-local-time-python
+# for more discussion.
+def date_from_string(s):
+  """Convert string S into a datetime.datetime.  S looks like
+  "Fri, 16 Jul 2010 07:08:23 -0700", "Wed, 8 Dec 2010 17:28:55 -0800",
+  etc, except that the timezone offset is optional."""
+  tzoffset, hours, mins = None, 0, 0
+  if s[-5] == '-' and re.match("[0-9][0-9][0-9][0-9]", s[-4:]):
+    s, tzoffset = s[:-6], s[-5:]
+    sign, hours, mins = tzoffset[0], int(tzoffset[1:3]), int(tzoffset[3:])
+    if sign == '-':
+      hours, mins = hours * -1, mins * -1
+  d = datetime.datetime.strptime(s, '%a, %d %b %Y %H:%M:%S')
+  return d + datetime.timedelta(hours = hours, minutes = mins)
+
+
+# An issue coming from JIRA looks like this:
+#
+# <item>
+#  <title>[MAD-174] summary of issue</title>
+#  <link>URL to issue (e.g., http://sfgovdt.jira.com/browse/MAD-174</link>
+#  <project id="10020" key="MAD">Enterprise Addressing System</project>
+#  <description>&lt;p&gt;Should probably consistently upper case things on the server where it matters (as with streets).&lt;/p&gt;</description>
+#  <environment/>
+#  <key id="10273">MAD-174</key>
+#  <summary>same as summary part of summary -- use this</summary>
+#  <type id="1" iconUrl="http://sfgovdt.jira.com/images/icons/bug.gif">Bug</type>
+#  <priority id="3"
+#            iconUrl="http://sfgovdt.jira.com/images/icons/priority_major.gif"
+#    >Major</priority>
+#  <status id="1"
+#          iconUrl="http://sfgovdt.jira.com/images/icons/status_open.gif"
+#    >Open</status>
+#  <resolution id="-1">Unresolved</resolution>
+#  <assignee username="pmccullough">Paul McCullough</assignee>
+#  <reporter username="pmccullough">Paul McCullough</reporter>
+#  <created>Wed, 8 Dec 2010 17:28:55 -0800</created>
+#  <updated>Wed, 8 Dec 2010 17:28:55 -0800</updated>
+#  <version>1.0 beta</version>
+#  <fixVersion>1.0</fixVersion>
+#  <due/>
+#  <votes>0</votes>
+#  <comments>
+#   <comment id="10378"
+#            author="pmccullough"
+#            created="Fri, 3 Dec 2010 15:39:04 -0800"
+#     >&lt;p&gt;Attached is a histogram of unit nums in EAS.&lt;/p&gt;
+#     &lt;div class="code panel" style="border-width: 1px;"&gt;&lt;div class="codeContent panelContent"&gt;
+#lt;pre class="code-java"&gt;select count(*), unit_num
+#rom addresses
+#roup by unit_num
+#rder by unit_num&lt;/pre&gt;
+#lt;/div&gt;&lt;/div&gt;</comment>
+# </comments>
+# <attachments>
+#  <attachment id="10023"
+#    name="distinct_unit_num.csv"
+#    size="75809"
+#    author="pmccullough"
+#    created="Fri, 3 Dec 2010 15:39:04 -0800"/>
+#  </attachments>
+#  <subtasks></subtasks>
+#  <customfields>
+#   <customfield id="customfield_10011"
+#                key="com.atlassian.jira.plugin.labels:labels">
+#    <customfieldname>Epic/Theme</customfieldname>
+#    <customfieldvalues>
+#      <customfieldvalue><![CDATA[]]></customfieldvalue>
+#    </customfieldvalues>
+#   </customfield>
+#  </customfields>
+# </item>
+
+
+class IssueComment():
+  """A comment on an Issue.
+  TODO: The current representation is probably biased in favor of JIRA
+  issue comments, since that is the initial implementation.  Please
+  further generalize this class as more issue types are added."""
+  def __init__(self, parent_issue, author_username=None,
+               summary=None, body=None, date_created=None, source_id=None):
+    """
+    PARENT_ISSUE is an Issue, the issue to which this comment is attached
+    AUTHOR_USERNAME is a string or None.
+    SUMMARY is a string or None.
+    BODY is a string or None.
+    DATE_CREATED is a datetime or None.
+    SOURCE_ID is a string or None.
+    """
+    self.parent_issue = parent_issue
+    self.author_username = author_username
+    self.summary = summary
+    self.body = body
+    self.date_created = date_created
+    self.source_id = source_id
+
+  def __str__(self):
+    return """Comment %s by %s (%s), on issue %s:
+  %s
+  %s
+
+  """ % (self.source_id, self.author_username, self.date_created,
+         self.parent_issue.source_id, self.summary, self.body)
+
+
+class IssueAttachment():
+  """An attachment on an Issue (or, in the future, on an IssueComment).
+  TODO: Some systems attach attachments to comments, others to the
+  bug itself, and maybe some allow it to both.  Right now, what we
+  support is attachments on the bug itself, because that's what
+  JIRA seems to do."""
+  def __init__(self, parent_issue, source_id=None, filename=None, size=None,
+               username=None, date_created=None):
+    """TODO: document."""
+    self.parent_issue = parent_issue
+    self.source_id = source_id
+    self.filename = filename
+    self.size = size
+    self.username = username
+    self.date_created = date_created
+
+  def __str__(self):
+    return """Attachment '%s' uploaded by %s to %s
+(%d bytes on %s; original id %s)
+  """ % (self.filename, self.username, self.parent_issue.source_id,
+         self.size, self.date_created, self.source_id)
+
+
+class Issue():
+  def __init__(self,
+               summary,                # string: One-liner summary.
+               description,            # string: Initial description.
+               source_link,            # string: URL to original bug.
+               source_id,              # string: Unique id of original bug.
+               issue_type,             # string: defect / task / enhancement
+               priority,               # string: 
+               status,                 # string:
+               resolution,             # string:
+               reporter,               # User
+               assignee,               # User
+               date_created,           # datetime:
+               date_last_updated,      # datetime:
+               version_filed_against,  # string:
+               version_to_fix_by,      # string:
+               ):
+    self.summary               = summary
+    self.description           = description
+    self.source_link           = source_link
+    self.source_id             = source_id
+    self.issue_type            = issue_type
+    self.priority              = priority
+    self.status                = status
+    self.resolution            = resolution
+    self.reporter              = reporter
+    self.assignee              = assignee
+    self.date_created          = date_created
+    self.date_last_updated     = date_last_updated
+    self.version_filed_against = version_filed_against
+    self.version_to_fix_by     = version_to_fix_by
+    self.labels                = []  # strings
+    self.comments              = []  # See IssueComment
+    self.attachments           = []  # See IssueAttachment
+
+  def _backpointer(self, entity_type, orig_url, orig_author, orig_date):
+    """Return a string describing an original source (e.g., the
+    original issue or original comment from before the conversion).
+    This string is meant to be inserted at the top of an issue
+    description or comment, preceding the original data.
+
+    Arguments:
+    entity_type str What this was (e.g., "issue", "comment", "attachment")
+    orig_url str URL of the original entity
+    orig_author str Name or username of the original author
+    orig_date str Date of the original entity
+    """
+    return """### NOTE: This %s was originally filed by %s on %s, at
+### %s
+### Later it was imported here, but not all of the metadata and formatting were converted -- hence this note.  The original content is below.
+
+""" % (entity_type, orig_author, orig_date, orig_url)
+
+  def add_backpointer(self, orig_str, entity_type,
+                      orig_url, orig_author, orig_date):
+    return self._backpointer(entity_type, orig_url,
+                             orig_author, orig_date) + orig_str
+
+  def add_comment(self, source_id, author_username,
+                  date_created, summary, body):
+    """Add a comment.  TODO: document, yo."""
+    c = IssueComment(self, author_username, summary, body,
+                     date_created, source_id)
+    self.comments.append(c)
+
+  def add_attachment(self, source_id, filename, size, username, date_created):
+    """Add an attachment.  TODO: document, yo."""
+    a = IssueAttachment(self, source_id,
+                        filename, size, username, date_created)
+    self.attachments.append(a)
+
+  def add_label(self, label):
+    """Add LABEL to this issue iff it's not already on this issue."""
+    if label not in self.labels:
+      self.labels.append(label)
+
+  def __str__(self):
+    s = """Issue %s: %s
+  %s
+  
+  Source URL:      %s
+  Reporter:        %s (%s)
+  Assignee:        %s (%s)
+  Type:            %s
+  Priority:        %s
+  Status:          %s
+  Resolution:      %s
+  Filed against:   %s
+  Fixed in:        %s
+  Created:         %s
+  Last updated:    %s
+  Labels:          %s
+
+  """ % (self.source_id,
+         self.summary,
+         self.description,
+         self.source_link,
+         self.reporter,
+         self.assignee,
+         self.issue_type,
+         self.priority,
+         self.status,
+         self.resolution,
+         self.version_filed_against,
+         self.version_to_fix_by,
+         self.date_created,
+         self.date_last_updated,
+         ", ".join(self.labels),
+         )
+    for c in self.comments:
+      s = s + str(c)
+    for a in self.attachments:
+      s = s + str(a)
+    return s
+
+
+def issue_from_jira(jira_xml_obj):
+  """Return a generic Issue object based on JIRA_XML_OBJ."""
+  def safely_stringize(thing):
+    if hasattr(thing, 'data'):
+      thing = thing.data
+    if isinstance(thing, basestring): # TODO: Or ask if unicode?
+      return thing.encode('ascii', 'xmlcharrefreplace')
+    return thing
+  issue = Issue(safely_stringize(jira_xml_obj.summary),
+                safely_stringize(jira_xml_obj.description),
+                safely_stringize(jira_xml_obj.link),
+                safely_stringize(jira_xml_obj.key),
+                safely_stringize(jira_xml_obj.type),
+                safely_stringize(jira_xml_obj.priority),
+                safely_stringize(jira_xml_obj.status),
+                safely_stringize(jira_xml_obj.resolution),
+                User(safely_stringize(jira_xml_obj.reporter),
+                     safely_stringize(jira_xml_obj.reporter.username)),
+                User(safely_stringize(jira_xml_obj.assignee),
+                     safely_stringize(jira_xml_obj.assignee.username)),
+                date_from_string(safely_stringize(jira_xml_obj.created)),
+                date_from_string(safely_stringize(jira_xml_obj.updated)),
+                safely_stringize(jira_xml_obj.version),
+                safely_stringize(jira_xml_obj.fixVersion))
+
+  # Even though it at first looks like the JIRA <customfieldname> and
+  # <customfieldvalue> elements might be sort of like Google Code's
+  # "labels", it appears they aren't.  For now, just ignore them.
+  # 
+  # if jira_xml_obj.customfields:
+  #   for f in jira_xml_obj.customfields.customfield:
+  #     if f.key[-7:] == ":labels":
+  #       # Ignore the 'customfieldvalue', only the name matters.
+  #       issue.add_label(f.customfieldname)
+
+  if jira_xml_obj.comments:
+    for c in jira_xml_obj.comments.comment:
+      issue.add_comment(c.id, safely_stringize(c.author),
+                        date_from_string(c.created),
+                        None, safely_stringize(c))
+
+  if jira_xml_obj.attachments:
+    for a in jira_xml_obj.attachments.attachment:
+      issue.add_attachment(a.id, safely_stringize(a.name), int(a.size),
+                           safely_stringize(a.author),
+                           date_from_string(a.created))
+
+  return issue
+
+
+class User():
+  """A representation of a user who has identities in one or both of
+  the source and dest systems."""
+  def __init__(self, real_name=None, source_username=None,
+               dest_username=None, email_addr=None):
+    # While each arg is optional, they shouldn't all be None in practice.
+    self.real_name = real_name
+    self.source_username = source_username
+    self.dest_username = dest_username
+    self.email_addr = email_addr
+
+  def __str__(self):
+    # TODO: we don't currently include email_addr in the string
+    # representation, but we could if there were some reason to.
+    s = ""
+    if self.real_name:
+      s += "%s (" % self.real_name
+    if self.source_username:
+      s += "%s" % self.source_username
+    if self.source_username and self.dest_username:
+      s += " ==> "
+    if self.dest_username:
+      s += "%s" % self.dest_username
+    if self.real_name:
+      s += ")"
+    return s
+
+class UserMap():
+  """TODO: doc"""
+  def __init__(self, userdict):
+    self.userdict = userdict
+  def get_user(self, orig_user):
+    new_user = self.userdict.get(orig_user, None)
+    if new_user is None or new_user == '':
+      new_user = self.userdict.get('')
+    return new_user
+
+
+class GCHProject():
+  """A Google Code Hosting Project, reachable through a client."""
+  def __init__(self, name, client, username, usermap, source_type,
+               issue_link_template=None, issue_comment_link_template=None):
+    self.name = name
+    self.client = client
+    self.username = username
+    self.usermap = usermap
+    self.source_type = source_type
+    self.issue_link_template = issue_link_template
+    self.issue_comment_link_template = issue_comment_link_template
+    # A dictionary mapping issue ids from the old tracker to issue ids
+    # in the new tracker.  See self._translate_issue_ids().
+    self.issues_translation_table = {}
+    
+  def show_all_issues(self):
+    """Show all the issues in a project."""
+    feed = self.client.get_issues(self.name)
+    for issue in feed.entry:
+      print issue.title.text
+
+  def issue_id_from_atom_id(self, atom_id):
+    """Convert an atom.data.Id representing an issue ID to the ID string."""
+    # TODO: There's got to be an official way to convert an issue ID
+    # object to the issue's ID as a string, since the former is what
+    # gdata client functions return yet the latter is what they take
+    # as parameters.  However, I've been unable to find it, if it exists. 
+    #
+    # "http://code.google.com/feeds/issues/p/projport/issues/full/27"
+    # is the text part of the atom_id; we want the number on the end.
+    return atom_id.text[atom_id.text.rfind('/') + 1:]
+
+  def import_issue(self, issue):
+    """Import ISSUE into this Google Code Hosting project.
+    Return the Google Code Hosting issue thus created."""
+    gch_issue = None
+    owner = self.usermap.get_user(issue.assignee.source_username)
+    sys.stdout.flush()
+    dest_desc = issue.description
+    dest_status = "New"  # default to something the devs will see
+    if self.source_type == "jira":
+      # Leave a note at the top of the issue's main description,
+      # explaining that this issue was imported from elsewhere.
+      dest_desc = issue.add_backpointer(
+        dest_desc, "issue", issue.source_link,
+        issue.reporter, issue.date_created)
+      # Determine the destination's status/resolution.
+      #
+      # JIRA statuses:    Open, Reopened, Resolved
+      # JIRA resolutions: Unresolved, Fixed, Duplicate, Cannot Reproduce
+      # 
+      # (In JIRA, 'Open' or 'Reopened' status always means 'Unresolved'
+      # resolution, and status 'Resolved' means some other resolution.)
+      #
+      # Google statuses: New, Accepted, Started, [Closed status, see below]
+      #                  Fixed, Verified, Invalid, Duplicate, WontFix, Done
+      #
+      # So we need to fold JIRA's status/resolution combinations into
+      # Google's single status code.  Note that some of the Google
+      # statuses have no JIRA analog, so we'll never generate them
+      # in this converter.
+      if str(issue.status) == "Resolved":
+        if str(issue.resolution) == "Fixed":
+          dest_status = "Fixed"
+        elif str(issue.resolution) == "Duplicate":
+          dest_status = "Duplicate"
+        elif str(issue.resolution) == "Cannot Reproduce":
+          dest_status = "Invalid"
+      # Translate JIRA priority to Google priority.
+      if issue.priority:
+        # JIRA has five priorities: Blocker, Critical, Major, Minor, Trivial
+        # Google has four priorities: Critical, High, Medium, Low
+        # Translate from the former to the latter as best we can.
+        if (str(issue.priority) == "Blocker" or
+            str(issue.priority) == "Critical"):
+          issue.add_label("Priority-Critical")
+        elif str(issue.priority) == "Major":
+          issue.add_label("Priority-High")
+        elif str(issue.priority) == "Minor":
+          issue.add_label("Priority-Medium")
+        elif str(issue.priority) == "Trivial":
+          issue.add_label("Priority-Low")
+        else:
+          issue.add_label("Priority-Medium")
+      # Translate JIRA type to Google type.
+      if issue.issue_type:
+        # JIRA has four types: Bug, Task, Improvement, New Feature
+        # Google has five types: Defect, Task, Enhancement, Review, Other
+        # Translate from the former to the latter as best we can.
+        if str(issue.issue_type) == "Bug":
+          issue.add_label("Type-Defect")
+        elif str(issue.issue_type) == "Task":
+          issue.add_label("Type-Task")
+        elif (str(issue.issue_type) == "Improvement" or
+              str(issue.issue_type) == "New Feature"):
+          issue.add_label("Type-Enhancement")
+        else:
+          issue.add_label("Type-Other")
+      # Translate JIRA milestone to Google milestone.
+      if issue.version_to_fix_by:
+        issue.add_label("Milestone-%s" % issue.version_to_fix_by)
+      # Translate JIRA version to (our made-up) Google version.
+      if issue.version_filed_against:
+        issue.add_label("FoundIn-%s" % issue.version_filed_against)
+
+    def _translate_issue_ids(self, desc_or_comment):
+      """Append to DESC_OR_COMMENT a note showing the mapping between
+      issue ids from the original tracker mentioned in DESC_OR_COMMENT
+      and issue ids in the new tracker.  This is to enable users to
+      still follow links between issues even after switching trackers.
+
+      It would be even better to directly translate the links
+      themselves.  However, unfortunately they are often given in
+      inconsistent formats -- sometimes as a full URL, other times as
+      a special string that the original tracker knows how to expand,
+      e.g., "MAD-123".  The workaround is to simply find all the (unique)
+      occurrences of "MAD-[0-9]+" in the original DESC_OR_COMMENT, and
+      then append a note showing their ids in the new tracker, e.g.:
+
+         ### NOTE: The old issue ids mentioned in this comment map to
+         ### new issue ids in the following way:
+         ###
+         ###    MAP-61   ==>  issue #70
+         ###    MAP-123  ==>  issue #152
+         ###    MAP-125  ==>  issue #154
+      
+      That is a lot easier to implement, and just about as useful.
+
+      See self.issues_translation_table."""
+      # TODO: haven't actually implemented this yet.  Pity.
+      pass
+
+    # Helper for debugging conditional below.
+    def is_testing_issue(issue_id_str):
+      for num in 61, 128, 36: #, 123, 165, 174, 85:
+        if issue_id_str == "MAD-%d" % num:
+          return True
+      return False
+
+    # See http://code.google.com/p/support/issues/detail?id=4778
+    # for why we sometimes load only a few issues here.
+    # 
+    # if is_testing_issue(issue.source_id):
+    if True:
+      gch_issue = self.client.add_issue(
+        # project name, not issue name
+        self.name,
+        # We prepend the original issue's id to that title for
+        # historical traceability.  Even better would be to actually
+        # convert the links between issues to point to the new ones,
+        # and it's perfectly possible to do so, but it's a lot easier
+        # just to stick the original id in the title and let humans do
+        # the searching on the rare occasions when they need to trace
+        # back and forth between issues.
+        #
+        # Note that Google uses "title" for what we call "summary".
+        "(%s) %s" % (issue.source_id, issue.summary),
+        # And Google uses "summary" for what we call "description".
+        dest_desc,
+        # In the source code to add_issue, this parameter is named
+        # "author", but as it happens, we want to pass owner for it
+        # anyway (in online documentation, it is somewhat misleadingly
+        # called "owner" too).
+        owner,
+        # Now the real owner field.  Unfortunately, passing it here
+        # has no effect, and we have to do an additional call to
+        # update_issue() afterwards to actually set the owner.
+        owner=owner,
+        status=dest_status, labels=issue.labels)
+      gch_issue_id_str = self.issue_id_from_atom_id(gch_issue.id)
+      # See http://code.google.com/p/support/issues/detail?id=4790 for
+      # why we have to call update_issue() to set the owner here.
+      self.client.update_issue(
+        self.name, gch_issue_id_str, self.username, owner=owner)
+      # Record the old->new issue mapping.
+      self.issues_translation_table[issue.source_id] = gch_issue_id_str
+      # Send comments.
+      for c in issue.comments:
+        comment_owner = self.usermap.get_user(c.author_username)
+        dest_comment = issue.description
+        if self.source_type == "jira":
+          c_link = c.source_id
+          if self.issue_comment_link_template and issue.source_link:
+            c_link = self.issue_comment_link_template \
+                % (issue.source_link, c.source_id, c.source_id)
+          dest_comment = issue.add_backpointer(
+            c.body, "comment", c_link, c.author_username, c.date_created)
+        self.client.update_issue(
+          self.name, gch_issue_id_str, self.username, comment=dest_comment)
+    return gch_issue
+
+
+def authenticate_client(client, project, username, password):
+  """Authenticate CLIENT to PROJECT, with USERNAME and PASSWORD."""
+  client.client_login(username, password, source=project, service='code')
+
+
+def file_to_list(f):
+  """Create a list of strings from F, where each line becomes one element.
+  Leading and trailing whitespace (including the newline) are removed."""
+  handle = file(f)
+  lst = []
+  line = handle.readline()
+  while line != '':
+    lst.append(line.strip())
+    line = handle.readline()
+  return lst
+  
+
+def create_usermap(mapfile):
+  f = file(mapfile)
+  # TODO: Oh, wait, strip()ing here means any blank line in the file
+  # will end the loop.  That seems dumb.
+  line = f.readline().strip()
+  umap = {}
+  while line != '':
+    first_colon = line.find(':')
+    orig, new = line[:first_colon].lstrip(), line[first_colon + 1:].lstrip()
+    umap[orig] = new
+    line = f.readline().strip()
+  return UserMap(umap)
+
+
+def main():
+  error_exit   = False
+  project_name = None
+  username     = None
+  password     = None
+  issues_xml   = None
+  done_issues  = None
+
+  # Not currently used, because in JIRA issues we already get the
+  # original issue link just fine in the issue.source_link field.
+  issue_link_template = None
+
+  # For JIRA, the issue_comment_link_template looks something like:
+  #
+  #   %s?focusedCommentId=%s&page=com.atlassian.jira.plugin.system.\
+  #   issuetabpanels%%3Acomment-tabpanel#action_%s"
+  #
+  # ...where the three "%s" substitutions are:
+  # 
+  #   first %s   ==>  issue.source_link (that is, the issue URL)
+  #   second %s  ==>  comment ID (e.g., "10223")
+  #   third %s   ==>  comment ID (e.g., "10223"), yes, exactly the same
+  #
+  # (Note also the double "%%" in "%%3A"!  Since URI escape syntax and
+  # Python string interpolation syntax both use "%", we have to
+  # meta-escape the former to get correct results from the latter.)
+  issue_comment_link_template = None
+
+  # Dictionary mapping old usernames to new identities.  Entry whose
+  # key is empty string is the default, by convention.  Yes, that's
+  # kind of klugey.  Patches welcome.
+  usermap      = None
+
+  try:
+    opts, args = getopt.getopt(sys.argv[1:],
+                               'h?',
+                               [ "help",
+                                 "project=",
+                                 "username=",
+                                 "password=",
+                                 "usermap=",
+                                 "issues-xml=",   # XML data source file
+                                 "source-type=",  # e.g., "jira", etc.
+                                 "issue-link=",
+                                 "issue-comment-link=",
+                                 "done-issues=",
+                               ])
+  except getopt.GetoptError as e:
+    sys.stderr.write("Error: problem processing options: %s\n" % e)
+    usage(sys.stderr)
+    sys.exit(1)
+
+  for opt, val in opts:
+    if opt == '--help' or opt == '-h' or opt == '-?':
+      usage()
+      sys.exit(0)
+    elif opt == '--project':
+      project_name = val
+    elif opt == '--username':
+      username = val
+    elif opt == '--password':
+      # TODO: this should be read in at a non-echo prompt, to avoid a
+      # process listing revealing the password.
+      password = val
+    elif opt == '--usermap':
+      usermap = create_usermap(val)
+    elif opt == '--issues-xml':
+      issues_xml = file(val)
+    elif opt == '--source-type':
+      source_type = val
+    elif opt == '--issue-link':
+      issue_link_template = val
+    elif opt == '--issue-comment-link':
+      issue_comment_link_template = val
+    elif opt == '--done-issues':
+      done_issues = file_to_list(val)
+    else:
+      sys.stderr.write("Error: unrecognized option: '%s'\n" % opt)
+      error_exit = True
+
+  if source_type is None or source_type.lower() not in ("jira"):
+    sys.stderr.write("Error: unrecognized issues type: '%s'\n" % source_type)
+    error_exit = True
+
+  if error_exit:
+    usage(sys.stderr)
+    sys.exit(1)
+
+  client = gdata.projecthosting.client.ProjectHostingClient()
+  authenticate_client(client, project_name, username, password)
+  gch_proj = GCHProject(project_name, client, username, usermap, source_type,
+                        issue_link_template, issue_comment_link_template)
+
+  # Try parsing some JIRA XML.
+  issues = xml2obj(issues_xml)
+  # Cdr down the stack until we are the object of our desires.
+  if issues.channel:
+    issues = issues.channel.item
+  for jira_issue in issues:
+    issue = issue_from_jira(jira_issue)
+    if issue.source_id in done_issues:
+      print "Skipping %s" % issue.source_id
+    else:
+      print "Starting source issue %s..." % issue.source_id
+      try:
+        gch_issue = gch_proj.import_issue(issue)
+        print "Finished: %s => GCH %s" \
+            % (issue.source_id, gch_proj.issue_id_from_atom_id(gch_issue.id))
+      except Exception as e:
+        sys.stderr.write("Error: '%s'\n" % e)
+        sys.stderr.write("Remember to delete any issues started but "
+                         "not finished, before resuming!\n")
+  issues_xml.close()
+
+if __name__ == '__main__':
+  main()
