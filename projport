@@ -19,8 +19,95 @@ import datetime
 import xml.sax
 import xml.sax.handler
 
-def usage(output_stream=sys.stdout):
-  output_stream.write("TBD\n")
+def usage(output=sys.stdout, intro=True, summary=True, details=False):
+  """Print usage to OUTPUT.  By default, print intro block and
+  summary, but not details.  However these can be controlled
+  by the parameters of the same names."""
+
+  intro_block = """\
+projport: Convert a software project from one hosting site to another.
+
+(Well, that's the ambition anyway.  Right now, it only converts bugs
+from JIRA to Google Code Hosting.  One day it may do more.)
+"""
+
+  summary_block = """\
+Usage:
+
+  ./projport --project projport-test                          \\
+             --username yourname@gmail.com                    \\
+             --password yourpass                              \\
+             --usermap usermap.txt                            \\
+             --source-type jira                               \\
+             --done-issues done-issues.txt                    \\
+             --issues-xml sampledata/eas-jira-issues-1.xml    \\
+             --issue-comment-link "%%s?focusedCommentId=%%s&page=com.atlassian.jira.plugin.system.issuetabpanels%%%%3Acomment-tabpanel#action_%%s"
+"""
+
+  details_block = """\
+Options:
+
+  --project PROJ          Import issues into Google Code project PROJ
+  --username NAME@DOMAIN  Your Google username; should be an owner of PROJ
+  --password PASSWORD     Your Google password
+  --usermap FILE          Maps source users to dest users (see below)
+  --source-type jira      Only 'jira' is supported right now
+  --issues-xml FILE       XML file containing the source issues.
+  --issue-comment-link    See below.
+  --done-issues FILE      List of issues to skip (see below)
+
+You're probably wondering how to resume a conversion that gets
+interrupted in the middle (say, by a network error or a rate-limit
+error from the server).  See the explanation of the '--done-issues'
+option below.
+
+Detailed explanations of options:
+
+  * '--done-issues' takes a file, each line of which is an issue ID
+    from the original tracker (e.g., JIRA issue names often look like
+    "XGC-123", "MAD-70", etc).  These issues are not be converted.
+    The purpose of this option is to enable you to resume an issue
+    conversion that got interrupted in the middle -- perhaps by a
+    rate-limit error from the server, not that I'm looking at anyone
+    in particular, *cough* Google *cough*.  Since each issue requires
+    multiple API calls, it's possible for an issue to partly loaded
+    into the destination, but not completely finished.  By saving the
+    output from projport and munging it into the done-issues file in
+    the obvious way, you can skip all the converted issue issues that
+    have been completed so far, manually delete the one that was left
+    incomplete when the interrupt happened (this must be done via the
+    web UI, see http://code.google.com/p/support/issues/detail?id=4778),
+    and resume where you left off.
+
+  * '--usermap' also takes a file, each line of which is of the form
+    "source_username: dest_username" (where dest_username is likely a
+    Google username@domain combination).  This is to be able to
+    convert, say, an issue owner in the source tracker to an owner in
+    the dest tracker -- they might even be the same person but just
+    have different usernames in the two places.  If you have a line
+    where the source_username is the empty string, the dest_username
+    is the default dest user to use whenever there is no specific
+    mapping for the source user found in the input.
+
+  * '--issue-comment-link' option specifies a template string that,
+    when the template substitution is done, expands to a link to a
+    specific comment.  For JIRA issue comments, the three '%%s' items
+    in the template are: the URL to the original issue, the comment ID
+    number (as a string), and the comment ID again.  The purpose of
+    this template is so that in the generated comments in the dest
+    tracker, we can prepend a note giving the URL of comment in the
+    original tracker.
+
+"""
+  if intro:
+    print intro_block
+  if summary:
+    print summary_block
+  if details:
+    print details_block
+  else:
+    print "(Run './projport --help' to see detailed usage.)"
+
 
 #########################################################################
 ###
@@ -707,6 +794,7 @@ def main():
   project_name = None
   username     = None
   password     = None
+  source_type  = None
   issues_xml   = None
   done_issues  = None
 
@@ -751,12 +839,12 @@ def main():
                                ])
   except getopt.GetoptError as e:
     sys.stderr.write("Error: problem processing options: %s\n" % e)
-    usage(sys.stderr)
+    usage(output=sys.stderr, intro=False, summary=True, details=False)
     sys.exit(1)
 
   for opt, val in opts:
     if opt == '--help' or opt == '-h' or opt == '-?':
-      usage()
+      usage(output=sys.stdout, intro=True, summary=True, details=True)
       sys.exit(0)
     elif opt == '--project':
       project_name = val
@@ -782,12 +870,32 @@ def main():
       sys.stderr.write("Error: unrecognized option: '%s'\n" % opt)
       error_exit = True
 
-  if source_type is None or source_type.lower() not in ("jira"):
+  if project_name is None:
+    sys.stderr.write("Error: project name required\n")
+    error_exit = True
+
+  if username is None:
+    sys.stderr.write("Error: username for dest project required\n")
+    error_exit = True
+
+  if password is None:
+    sys.stderr.write("Error: password for dest project username required\n")
+    error_exit = True
+
+  if issues_xml is None:
+    sys.stderr.write("Error: '--issues-xml somefile.xml' required\n")
+    error_exit = True
+
+  if source_type is None:
+    sys.stderr.write("Error: '--issues-type' required (e.g., 'jira')\n")
+    error_exit = True
+  elif source_type.lower() not in ("jira"):
     sys.stderr.write("Error: unrecognized issues type: '%s'\n" % source_type)
     error_exit = True
 
   if error_exit:
-    usage(sys.stderr)
+    sys.stderr.write("\n")
+    usage(output=sys.stderr, intro=False, summary=True, details=False)
     sys.exit(1)
 
   client = gdata.projecthosting.client.ProjectHostingClient()
