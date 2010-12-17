@@ -41,3 +41,11 @@ Development Resources:
   And yes, I know the code is in a terrible state.  I wrote this over
   two days in a big hurry, to convert http://code.google.com/p/eas/.
   Please help improve it, and then we can get rid of this note :-).
+
+Credits:
+========
+
+O'Reilly Media supported the development of this tool by donating
+programmer time to the non-profits Code for America and Civic Commons,
+who in turn needed the tool for their work in helping open source
+public-sector code.
