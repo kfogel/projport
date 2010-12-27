@@ -598,6 +598,33 @@ class GCHProject():
     # is the text part of the atom_id; we want the number on the end.
     return atom_id.text[atom_id.text.rfind('/') + 1:]
 
+  def _translate_issue_ids(self, desc_or_comment):
+    """Append to DESC_OR_COMMENT a note showing the mapping between
+    issue ids from the original tracker mentioned in DESC_OR_COMMENT
+    and issue ids in the new tracker.  This is to enable users to
+    still follow links between issues even after switching trackers.
+
+    It would be even better to directly translate the links
+    themselves.  However, unfortunately they are often given in
+    inconsistent formats -- sometimes as a full URL, other times as
+    a special string that the original tracker knows how to expand,
+    e.g., "MAD-123".  The workaround is to simply find all the (unique)
+    occurrences of "MAD-[0-9]+" in the original DESC_OR_COMMENT, and
+    then append a note showing their ids in the new tracker, e.g.:
+
+       ### NOTE: The old issue ids mentioned in this comment map to
+       ### new issue ids in the following way:
+       ###
+       ###    MAP-61   ==>  issue #70
+       ###    MAP-123  ==>  issue #152
+       ###    MAP-125  ==>  issue #154
+    
+    That is a lot easier to implement, and just about as useful.
+
+    See self.issues_translation_table."""
+    # TODO: haven't actually implemented this yet.  Pity.
+    pass
+
   def import_issue(self, issue):
     """Import ISSUE into this Google Code Hosting project.
     Return the Google Code Hosting issue thus created."""
@@ -671,79 +698,51 @@ class GCHProject():
       if issue.version_filed_against:
         issue.add_label("FoundIn-%s" % issue.version_filed_against)
 
-    def _translate_issue_ids(self, desc_or_comment):
-      """Append to DESC_OR_COMMENT a note showing the mapping between
-      issue ids from the original tracker mentioned in DESC_OR_COMMENT
-      and issue ids in the new tracker.  This is to enable users to
-      still follow links between issues even after switching trackers.
-
-      It would be even better to directly translate the links
-      themselves.  However, unfortunately they are often given in
-      inconsistent formats -- sometimes as a full URL, other times as
-      a special string that the original tracker knows how to expand,
-      e.g., "MAD-123".  The workaround is to simply find all the (unique)
-      occurrences of "MAD-[0-9]+" in the original DESC_OR_COMMENT, and
-      then append a note showing their ids in the new tracker, e.g.:
-
-         ### NOTE: The old issue ids mentioned in this comment map to
-         ### new issue ids in the following way:
-         ###
-         ###    MAP-61   ==>  issue #70
-         ###    MAP-123  ==>  issue #152
-         ###    MAP-125  ==>  issue #154
-      
-      That is a lot easier to implement, and just about as useful.
-
-      See self.issues_translation_table."""
-      # TODO: haven't actually implemented this yet.  Pity.
-      pass
-
-    if True:
-      gch_issue = self.client.add_issue(
-        # project name, not issue name
-        self.name,
-        # We prepend the original issue's id to that title for
-        # historical traceability.  Even better would be to actually
-        # convert the links between issues to point to the new ones,
-        # and it's perfectly possible to do so, but it's a lot easier
-        # just to stick the original id in the title and let humans do
-        # the searching on the rare occasions when they need to trace
-        # back and forth between issues.
-        #
-        # Note that Google uses "title" for what we call "summary".
-        "(%s) %s" % (issue.source_id, issue.summary),
-        # And Google uses "summary" for what we call "description".
-        dest_desc,
-        # In the source code to add_issue, this parameter is named
-        # "author", but as it happens, we want to pass owner for it
-        # anyway (in online documentation, it is somewhat misleadingly
-        # called "owner" too).
-        owner,
-        # Now the real owner field.  Unfortunately, passing it here
-        # has no effect, and we have to do an additional call to
-        # update_issue() afterwards to actually set the owner.
-        owner=owner,
-        status=dest_status, labels=issue.labels)
-      gch_issue_id_str = self.issue_id_from_atom_id(gch_issue.id)
-      # See http://code.google.com/p/support/issues/detail?id=4790 for
-      # why we have to call update_issue() to set the owner here.
+    gch_issue = self.client.add_issue(
+      # project name, not issue name
+      self.name,
+      # We prepend the original issue's id to that title for
+      # historical traceability.  Even better would be to actually
+      # convert the links between issues to point to the new ones,
+      # and it's perfectly possible to do so, but it's a lot easier
+      # just to stick the original id in the title and let humans do
+      # the searching on the rare occasions when they need to trace
+      # back and forth between issues.
+      #
+      # Note that Google uses "title" for what we call "summary".
+      "(%s) %s" % (issue.source_id, issue.summary),
+      # And Google uses "summary" for what we call "description".
+      dest_desc,
+      # In the source code to add_issue, this parameter is named
+      # "author", but as it happens, we want to pass owner for it
+      # anyway (in online documentation, it is somewhat misleadingly
+      # called "owner" too).
+      owner,
+      # Now the real owner field.  Unfortunately, passing it here
+      # has no effect, and we have to do an additional call to
+      # update_issue() afterwards to actually set the owner.
+      owner=owner,
+      status=dest_status, labels=issue.labels)
+    gch_issue_id_str = self.issue_id_from_atom_id(gch_issue.id)
+    # See http://code.google.com/p/support/issues/detail?id=4790 for
+    # why we have to call update_issue() to set the owner here.
+    self.client.update_issue(
+      self.name, gch_issue_id_str, self.username, owner=owner)
+    # Record the old->new issue mapping.
+    self.issues_translation_table[issue.source_id] = gch_issue_id_str
+    # Send comments.
+    for c in issue.comments:
+      comment_owner = self.usermap.get_user(c.author_username)
+      dest_comment = issue.description
+      if self.source_type == "jira":
+        c_link = c.source_id
+        if self.issue_comment_link_template and issue.source_link:
+          c_link = self.issue_comment_link_template \
+              % (issue.source_link, c.source_id, c.source_id)
+        dest_comment = issue.add_backpointer(
+          c.body, "comment", c_link, c.author_username, c.date_created)
       self.client.update_issue(
-        self.name, gch_issue_id_str, self.username, owner=owner)
-      # Record the old->new issue mapping.
-      self.issues_translation_table[issue.source_id] = gch_issue_id_str
-      # Send comments.
-      for c in issue.comments:
-        comment_owner = self.usermap.get_user(c.author_username)
-        dest_comment = issue.description
-        if self.source_type == "jira":
-          c_link = c.source_id
-          if self.issue_comment_link_template and issue.source_link:
-            c_link = self.issue_comment_link_template \
-                % (issue.source_link, c.source_id, c.source_id)
-          dest_comment = issue.add_backpointer(
-            c.body, "comment", c_link, c.author_username, c.date_created)
-        self.client.update_issue(
-          self.name, gch_issue_id_str, self.username, comment=dest_comment)
+        self.name, gch_issue_id_str, self.username, comment=dest_comment)
     return gch_issue
 
 
