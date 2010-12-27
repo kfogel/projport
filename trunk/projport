@@ -784,7 +784,7 @@ def main():
   password     = None
   source_type  = None
   issues_xml   = None
-  done_issues  = None
+  done_issues  = []
 
   # Not currently used, because in JIRA issues we already get the
   # original issue link just fine in the issue.source_link field.
