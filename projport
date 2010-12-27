@@ -698,17 +698,6 @@ class GCHProject():
       # TODO: haven't actually implemented this yet.  Pity.
       pass
 
-    # Helper for debugging conditional below.
-    def is_testing_issue(issue_id_str):
-      for num in 61, 128, 36: #, 123, 165, 174, 85:
-        if issue_id_str == "MAD-%d" % num:
-          return True
-      return False
-
-    # See http://code.google.com/p/support/issues/detail?id=4778
-    # for why we sometimes load only a few issues here.
-    # 
-    # if is_testing_issue(issue.source_id):
     if True:
       gch_issue = self.client.add_issue(
         # project name, not issue name
