@@ -478,6 +478,7 @@ class Issue():
     return s
 
 
+# TODO: This should really be @staticmethod Issue.from_jira_xml().
 def issue_from_jira(jira_xml_obj):
   """Return a generic Issue object based on JIRA_XML_OBJ."""
   def safely_stringize(thing):
@@ -633,6 +634,9 @@ class GCHProject():
     sys.stdout.flush()
     dest_desc = issue.description
     dest_status = "New"  # default to something the devs will see
+    # TODO: This is the wrong place to be asking if the source_type is
+    # "jira".  We should do all this stuff when the source issue is
+    # imported into a generic interchange issue.
     if self.source_type == "jira":
       # Leave a note at the top of the issue's main description,
       # explaining that this issue was imported from elsewhere.
@@ -662,6 +666,9 @@ class GCHProject():
         elif str(issue.resolution) == "Cannot Reproduce":
           dest_status = "Invalid"
       # Translate JIRA priority to Google priority.
+      # TODO: The right way to do this is to translate JIRA priority
+      # to a generic interchange priority in the Issue class, then
+      # translate the interchange priority to GCH priority here.
       if issue.priority:
         # JIRA has five priorities: Blocker, Critical, Major, Minor, Trivial
         # Google has four priorities: Critical, High, Medium, Low
@@ -678,6 +685,9 @@ class GCHProject():
         else:
           issue.add_label("Priority-Medium")
       # Translate JIRA type to Google type.
+      # TODO: The right way to do this is to translate JIRA type
+      # to a generic interchange type in the Issue class, then
+      # translate the interchange type to GCH type here.
       if issue.issue_type:
         # JIRA has four types: Bug, Task, Improvement, New Feature
         # Google has five types: Defect, Task, Enhancement, Review, Other
@@ -692,6 +702,9 @@ class GCHProject():
         else:
           issue.add_label("Type-Other")
       # Translate JIRA milestone to Google milestone.
+      # TODO: The right way to do this is to translate JIRA milestone
+      # to a generic interchange milestone in the Issue class, then
+      # translate the interchange milestone to GCH milestone here.
       if issue.version_to_fix_by:
         issue.add_label("Milestone-%s" % issue.version_to_fix_by)
       # Translate JIRA version to (our made-up) Google version.
@@ -734,6 +747,9 @@ class GCHProject():
     for c in issue.comments:
       comment_owner = self.usermap.get_user(c.author_username)
       dest_comment = issue.description
+      # TODO: The addition of the source link should have happened
+      # when the generic issue was created from the JIRA issue.
+      # There's no reason to be asking if source_type == "jira" here.
       if self.source_type == "jira":
         c_link = c.source_id
         if self.issue_comment_link_template and issue.source_link:
@@ -848,6 +864,7 @@ def main():
       issues_xml = file(val)
     elif opt == '--source-type':
       source_type = val
+    # TODO: need a dest_type too.
     elif opt == '--issue-link':
       issue_link_template = val
     elif opt == '--issue-comment-link':
@@ -885,6 +902,8 @@ def main():
     sys.stderr.write("\n")
     usage(output=sys.stderr, intro=False, summary=True, details=False)
     sys.exit(1)
+
+  # TODO: If we had dest_type, everything below would be conditionalized.
 
   client = gdata.projecthosting.client.ProjectHostingClient()
   authenticate_client(client, project_name, username, password)
