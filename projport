@@ -719,9 +719,7 @@ class GCHProject():
     for c in issue.comments:
       comment_owner = self.usermap.get_user(c.author_username)
       dest_comment = issue.description
-      # TODO: The addition of the source link should have happened
-      # when the generic issue was created from the JIRA issue.
-      # There's no reason to be asking if source_type == "jira" here.
+      # TODO: Issue #137
       if self.source_type == "jira":
         c_link = c.source_id
         if self.issue_comment_link_template and issue.source_link:
@@ -753,8 +751,7 @@ def file_to_list(f):
 
 def create_usermap(mapfile):
   f = file(mapfile)
-  # TODO: Oh, wait, strip()ing here means any blank line in the file
-  # will end the loop.  That seems dumb.
+  # TODO: Issue #138
   line = f.readline().strip()
   umap = {}
   while line != '':
@@ -827,8 +824,7 @@ def main():
     elif opt == '--username':
       username = val
     elif opt == '--password':
-      # TODO: this should be read in at a non-echo prompt, to avoid a
-      # process listing revealing the password.
+      # TODO: Issue #139
       password = val
     elif opt == '--usermap':
       usermap = create_usermap(val)
@@ -836,7 +832,7 @@ def main():
       issues_xml = file(val)
     elif opt == '--source-type':
       source_type = val
-    # TODO: need a dest_type too.
+    # TODO: Issue #140
     elif opt == '--issue-link':
       issue_link_template = val
     elif opt == '--issue-comment-link':
@@ -875,7 +871,7 @@ def main():
     usage(output=sys.stderr, intro=False, summary=True, details=False)
     sys.exit(1)
 
-  # TODO: If we had dest_type, everything below would be conditionalized.
+  # TODO: Issue #140
 
   client = gdata.projecthosting.client.ProjectHostingClient()
   authenticate_client(client, project_name, username, password)
