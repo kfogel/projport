@@ -339,10 +339,10 @@ class IssueComment():
 
 class IssueAttachment():
   """An attachment on an Issue (or, in the future, on an IssueComment).
-  TODO: """
+  TODO: see Issue #126"""
   def __init__(self, parent_issue, source_id=None, filename=None, size=None,
                username=None, date_created=None):
-    """TODO: see Issue #126"""
+    """TODO: document."""
     self.parent_issue = parent_issue
     self.source_id = source_id
     self.filename = filename
