@@ -473,13 +473,13 @@ class Issue():
     return s
 
 
-# TODO: This should really be @staticmethod Issue.from_jira_xml().
+# TODO: Issue #127
 def issue_from_jira(jira_xml_obj):
   """Return a generic Issue object based on JIRA_XML_OBJ."""
   def safely_stringize(thing):
     if hasattr(thing, 'data'):
       thing = thing.data
-    if isinstance(thing, basestring): # TODO: Or ask if unicode?
+    if isinstance(thing, basestring): # TODO: Issue #128
       return thing.encode('ascii', 'xmlcharrefreplace')
     return thing
   issue = Issue(safely_stringize(jira_xml_obj.summary),
@@ -536,8 +536,7 @@ class User():
     self.email_addr = email_addr
 
   def __str__(self):
-    # TODO: we don't currently include email_addr in the string
-    # representation, but we could if there were some reason to.
+    # TODO: Issue #129
     s = ""
     if self.real_name:
       s += "%s (" % self.real_name
@@ -552,7 +551,7 @@ class User():
     return s
 
 class UserMap():
-  """TODO: doc"""
+  """TODO: Issue #130"""
   def __init__(self, userdict):
     self.userdict = userdict
   def get_user(self, orig_user):
@@ -585,11 +584,7 @@ class GCHProject():
 
   def issue_id_from_atom_id(self, atom_id):
     """Convert an atom.data.Id representing an issue ID to the ID string."""
-    # TODO: There's got to be an official way to convert an issue ID
-    # object to the issue's ID as a string, since the former is what
-    # gdata client functions return yet the latter is what they take
-    # as parameters.  However, I've been unable to find it, if it exists. 
-    #
+    # TODO: Issue #131
     # "http://code.google.com/feeds/issues/p/projport/issues/full/27"
     # is the text part of the atom_id; we want the number on the end.
     return atom_id.text[atom_id.text.rfind('/') + 1:]
@@ -598,15 +593,7 @@ class GCHProject():
     """Append to DESC_OR_COMMENT a note showing the mapping between
     issue ids from the original tracker mentioned in DESC_OR_COMMENT
     and issue ids in the new tracker.  This is to enable users to
-    still follow links between issues even after switching trackers.
-
-    It would be even better to directly translate the links
-    themselves.  However, unfortunately they are often given in
-    inconsistent formats -- sometimes as a full URL, other times as
-    a special string that the original tracker knows how to expand,
-    e.g., "MAD-123".  The workaround is to simply find all the (unique)
-    occurrences of "MAD-[0-9]+" in the original DESC_OR_COMMENT, and
-    then append a note showing their ids in the new tracker, e.g.:
+    still follow links between issues even after switching trackers, e.g.:
 
        ### NOTE: The old issue ids mentioned in this comment map to
        ### new issue ids in the following way:
@@ -614,11 +601,9 @@ class GCHProject():
        ###    MAP-61   ==>  issue #70
        ###    MAP-123  ==>  issue #152
        ###    MAP-125  ==>  issue #154
-    
-    That is a lot easier to implement, and just about as useful.
 
     See self.issues_translation_table."""
-    # TODO: haven't actually implemented this yet.  Pity.
+    # TODO: Issue #132
     pass
 
   def import_issue(self, issue):
@@ -629,9 +614,7 @@ class GCHProject():
     sys.stdout.flush()
     dest_desc = issue.description
     dest_status = "New"  # default to something the devs will see
-    # TODO: This is the wrong place to be asking if the source_type is
-    # "jira".  We should do all this stuff when the source issue is
-    # imported into a generic interchange issue.
+    # TODO: Issue #133
     if self.source_type == "jira":
       # Leave a note at the top of the issue's main description,
       # explaining that this issue was imported from elsewhere.
@@ -661,9 +644,7 @@ class GCHProject():
         elif str(issue.resolution) == "Cannot Reproduce":
           dest_status = "Invalid"
       # Translate JIRA priority to Google priority.
-      # TODO: The right way to do this is to translate JIRA priority
-      # to a generic interchange priority in the Issue class, then
-      # translate the interchange priority to GCH priority here.
+      # TODO: Issue #134
       if issue.priority:
         # JIRA has five priorities: Blocker, Critical, Major, Minor, Trivial
         # Google has four priorities: Critical, High, Medium, Low
@@ -680,9 +661,7 @@ class GCHProject():
         else:
           issue.add_label("Priority-Medium")
       # Translate JIRA type to Google type.
-      # TODO: The right way to do this is to translate JIRA type
-      # to a generic interchange type in the Issue class, then
-      # translate the interchange type to GCH type here.
+      # TODO: Issue #135
       if issue.issue_type:
         # JIRA has four types: Bug, Task, Improvement, New Feature
         # Google has five types: Defect, Task, Enhancement, Review, Other
@@ -697,9 +676,7 @@ class GCHProject():
         else:
           issue.add_label("Type-Other")
       # Translate JIRA milestone to Google milestone.
-      # TODO: The right way to do this is to translate JIRA milestone
-      # to a generic interchange milestone in the Issue class, then
-      # translate the interchange milestone to GCH milestone here.
+      # TODO: Issue #136
       if issue.version_to_fix_by:
         issue.add_label("Milestone-%s" % issue.version_to_fix_by)
       # Translate JIRA version to (our made-up) Google version.
