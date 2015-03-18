@@ -1,5 +1,19 @@
 #!/usr/bin/python
 
+# Copyright (C) 2010 Karl Fogel
+# 
+# ProjPort is free software: you can redistribute it and modify
+# it under the terms of the GNU Affero General Public License (AGPL)
+# as published by the Free Software Foundation, either version 3 of the
+# License or (at your option) any later version.
+# 
+# ProjPort is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License included below for more details.  
+# 
+# The license can also be seen at <http://www.gnu.org/licenses/agpl.html>.
+
 # For Google Code Hosting.
 import gdata.projecthosting.client
 import gdata.projecthosting.data
