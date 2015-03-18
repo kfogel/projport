@@ -1,11 +1,8 @@
-##########################################################################
-###                                                                    ###
-###   projport: project hosting converter tool (issues only, so far)   ###
-###                                                                    ###
-##########################################################################
+projport: open source project hosting converter tool (in progress)
+==================================================================
 
 Usage:
-======
+------
 
   Run './projport --help' to see usage.
 
@@ -19,7 +16,7 @@ Usage:
   on it).  When it's ready for use, this README will say so.
 
 Installation:
-=============
+-------------
 
   hg clone https://gdata-python-client.googlecode.com/hg/ gdata-python-client
   cd gdata-python-client
@@ -29,7 +26,7 @@ Installation:
   ./projport --help
 
 Development Resources:
-======================
+----------------------
 
   http://code.google.com/p/projport
 
@@ -43,7 +40,7 @@ Development Resources:
   Please help improve it, and then we can get rid of this note :-).
 
 Credits:
-========
+--------
 
   O'Reilly Media supported the development of this tool by donating
   programmer time to the non-profits Code for America and Civic
