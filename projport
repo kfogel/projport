@@ -50,6 +50,7 @@ Usage:
 
   ./projport --project projport-test                          \\
              --username yourname@gmail.com                    \\
+             ### TODO: This should be done w/ OAuth nowadays:
              --password yourpass                              \\
              --usermap usermap.txt                            \\
              --source-type jira                               \\
@@ -63,6 +64,7 @@ Options:
 
   --project PROJ          Import issues into Google Code project PROJ
   --username NAME@DOMAIN  Your Google username; should be an owner of PROJ
+  ### TODO: This should be done w/ OAuth nowadays:
   --password PASSWORD     Your Google password
   --usermap FILE          Maps source users to dest users (see below)
   --source-type jira      Only 'jira' is supported right now
