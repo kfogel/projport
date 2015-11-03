@@ -265,6 +265,27 @@ def date_from_string(s):
   d = datetime.datetime.strptime(s, '%a, %d %b %Y %H:%M:%S')
   return d + datetime.timedelta(hours = hours, minutes = mins)
 
+#########################################################################
+#                                                                       #
+#                A General Note About Architecture.                     #
+#                ==================================                     #
+#                                                                       #
+# The long-term goal is a multiway converter, and the right way to      #
+# make a multiway converter is to have an internal interchange format   #
+# that is a superset of (i.e., the union of) all the input variants we  #
+# support.  In other words, we have an internal Issue type that is      #
+# capable of losslessly representing all the information offered by     #
+# a ticket from any of the issue trackers we support, and that uses     #
+# the same internal field wherever the semantics are the same between   #
+# two different trackers, no matter what field name(s) that particular  #
+# information might be stored in in those trackers.                     #
+#                                                                       #
+# So that's how things are done here.  The internal representation      #
+# remains constant, and tracker-specific functionality wraps it on the  #
+# way in and the way out.  The boundary between the two should be       #
+# completely clear at all times; if it's not, something is wrong.       #
+#                                                                       #
+#########################################################################
 
 class IssueComment():
   """A comment on an Issue.
