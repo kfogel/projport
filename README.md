@@ -6,14 +6,23 @@ Usage:
 
 Run './projport --help' to see usage.
 
-Some day, this tool may automatically convert (port) a software
-project entirely from one hosting platform to another.  Right now,
-it only knows how to convert JIRA issues (in XML format) to Google
-Code Hosting issues (via network API calls).
+*Short-term:* This tool automatically converts JIRA issues (from official 
+JIRA-exported XML) into Google Code Hosting issues.  Yes, I know Google Code
+Hosting is deprecated now, but it wasn't when this tool was written.
 
-There's some other stuff in this directory, like 'html2wiki', that's
-very much work-in-progress.  Just ignore it (unless you want to work
-on it).  When it's ready for use, this README will say so.
+*Long-term:* Eventually we'd like this tool to automatically convert (port)
+a software project entirely from one project-hosting platform to another.
+And converting bug tickets between more systems would be a good intermediate
+step on the way to that.
+
+But for now, it only knows how to convert JIRA issues to Google Code Hosting
+issues, via network API calls.  In what must surely be the most ironic
+auto-export ever, this code was itself automatically moved from
+https://code.google.com/p/projport to GitHub when the former shut down.
+
+(Note: There's some other stuff in this directory, like 'html2wiki',
+that's very much work-in-progress.  Just ignore it, unless you want to
+work on it.  When it's ready for use, this README will say so.)
 
 Installation:
 -------------
