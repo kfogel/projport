@@ -266,64 +266,6 @@ def date_from_string(s):
   return d + datetime.timedelta(hours = hours, minutes = mins)
 
 
-# An issue coming from JIRA looks like this:
-#
-# <item>
-#  <title>[MAD-174] summary of issue</title>
-#  <link>URL to issue (e.g., http://sfgovdt.jira.com/browse/MAD-174</link>
-#  <project id="10020" key="MAD">Enterprise Addressing System</project>
-#  <description>&lt;p&gt;Should probably consistently upper case things on the server where it matters (as with streets).&lt;/p&gt;</description>
-#  <environment/>
-#  <key id="10273">MAD-174</key>
-#  <summary>same as summary part of summary -- use this</summary>
-#  <type id="1" iconUrl="http://sfgovdt.jira.com/images/icons/bug.gif">Bug</type>
-#  <priority id="3"
-#            iconUrl="http://sfgovdt.jira.com/images/icons/priority_major.gif"
-#    >Major</priority>
-#  <status id="1"
-#          iconUrl="http://sfgovdt.jira.com/images/icons/status_open.gif"
-#    >Open</status>
-#  <resolution id="-1">Unresolved</resolution>
-#  <assignee username="pmccullough">Paul McCullough</assignee>
-#  <reporter username="pmccullough">Paul McCullough</reporter>
-#  <created>Wed, 8 Dec 2010 17:28:55 -0800</created>
-#  <updated>Wed, 8 Dec 2010 17:28:55 -0800</updated>
-#  <version>1.0 beta</version>
-#  <fixVersion>1.0</fixVersion>
-#  <due/>
-#  <votes>0</votes>
-#  <comments>
-#   <comment id="10378"
-#            author="pmccullough"
-#            created="Fri, 3 Dec 2010 15:39:04 -0800"
-#     >&lt;p&gt;Attached is a histogram of unit nums in EAS.&lt;/p&gt;
-#     &lt;div class="code panel" style="border-width: 1px;"&gt;&lt;div class="codeContent panelContent"&gt;
-#lt;pre class="code-java"&gt;select count(*), unit_num
-#rom addresses
-#roup by unit_num
-#rder by unit_num&lt;/pre&gt;
-#lt;/div&gt;&lt;/div&gt;</comment>
-# </comments>
-# <attachments>
-#  <attachment id="10023"
-#    name="distinct_unit_num.csv"
-#    size="75809"
-#    author="pmccullough"
-#    created="Fri, 3 Dec 2010 15:39:04 -0800"/>
-#  </attachments>
-#  <subtasks></subtasks>
-#  <customfields>
-#   <customfield id="customfield_10011"
-#                key="com.atlassian.jira.plugin.labels:labels">
-#    <customfieldname>Epic/Theme</customfieldname>
-#    <customfieldvalues>
-#      <customfieldvalue><![CDATA[]]></customfieldvalue>
-#    </customfieldvalues>
-#   </customfield>
-#  </customfields>
-# </item>
-
-
 class IssueComment():
   """A comment on an Issue.
   TODO: See Issue #125 """
@@ -492,6 +434,63 @@ class Issue():
 # TODO: Issue #127
 def issue_from_jira(jira_xml_obj):
   """Return a generic Issue object based on JIRA_XML_OBJ."""
+  # An issue coming from JIRA looks like this:
+  #
+  # <item>
+  #  <title>[MAD-174] summary of issue</title>
+  #  <link>URL to issue (e.g., http://sfgovdt.jira.com/browse/MAD-174</link>
+  #  <project id="10020" key="MAD">Enterprise Addressing System</project>
+  #  <description>&lt;p&gt;Should probably consistently upper case things on the server where it matters (as with streets).&lt;/p&gt;</description>
+  #  <environment/>
+  #  <key id="10273">MAD-174</key>
+  #  <summary>same as summary part of summary -- use this</summary>
+  #  <type id="1" iconUrl="http://sfgovdt.jira.com/images/icons/bug.gif">Bug</type>
+  #  <priority id="3"
+  #            iconUrl="http://sfgovdt.jira.com/images/icons/priority_major.gif"
+  #    >Major</priority>
+  #  <status id="1"
+  #          iconUrl="http://sfgovdt.jira.com/images/icons/status_open.gif"
+  #    >Open</status>
+  #  <resolution id="-1">Unresolved</resolution>
+  #  <assignee username="pmccullough">Paul McCullough</assignee>
+  #  <reporter username="pmccullough">Paul McCullough</reporter>
+  #  <created>Wed, 8 Dec 2010 17:28:55 -0800</created>
+  #  <updated>Wed, 8 Dec 2010 17:28:55 -0800</updated>
+  #  <version>1.0 beta</version>
+  #  <fixVersion>1.0</fixVersion>
+  #  <due/>
+  #  <votes>0</votes>
+  #  <comments>
+  #   <comment id="10378"
+  #            author="pmccullough"
+  #            created="Fri, 3 Dec 2010 15:39:04 -0800"
+  #     >&lt;p&gt;Attached is a histogram of unit nums in EAS.&lt;/p&gt;
+  #     &lt;div class="code panel" style="border-width: 1px;"&gt;&lt;div class="codeContent panelContent"&gt;
+  #lt;pre class="code-java"&gt;select count(*), unit_num
+  #rom addresses
+  #roup by unit_num
+  #rder by unit_num&lt;/pre&gt;
+  #lt;/div&gt;&lt;/div&gt;</comment>
+  # </comments>
+  # <attachments>
+  #  <attachment id="10023"
+  #    name="distinct_unit_num.csv"
+  #    size="75809"
+  #    author="pmccullough"
+  #    created="Fri, 3 Dec 2010 15:39:04 -0800"/>
+  #  </attachments>
+  #  <subtasks></subtasks>
+  #  <customfields>
+  #   <customfield id="customfield_10011"
+  #                key="com.atlassian.jira.plugin.labels:labels">
+  #    <customfieldname>Epic/Theme</customfieldname>
+  #    <customfieldvalues>
+  #      <customfieldvalue><![CDATA[]]></customfieldvalue>
+  #    </customfieldvalues>
+  #   </customfield>
+  #  </customfields>
+  # </item>
+
   def safely_stringize(thing):
     if hasattr(thing, 'data'):
       thing = thing.data
