@@ -4,7 +4,7 @@ projport: open source project hosting converter tool (in progress)
 Usage:
 ------
 
-Run './projport --help' to see usage.
+Run `./projport --help` to see usage.
 
 *Short-term:* This tool automatically converts JIRA issues (from official 
 JIRA-exported XML) into Google Code Hosting issues.  Yes, I know Google Code
@@ -12,10 +12,10 @@ Hosting is deprecated now, but it wasn't when this tool was written.
 
 *Long-term:* Eventually we'd like this tool to automatically convert (port)
 a software project entirely from one project-hosting platform to another.
-And converting bug tickets between more systems would be a good intermediate
-step on the way to that.
+Converting bug tickets between more systems is a good intermediate step on
+the way to that.
 
-But for now, it only knows how to convert JIRA issues to Google Code Hosting
+For now, it only knows how to convert JIRA issues to Google Code Hosting
 issues, via network API calls.  In what must surely be the most ironic
 auto-export ever, this code was itself automatically moved from
 https://code.google.com/p/projport to GitHub when the former shut down.
@@ -52,7 +52,7 @@ Please help improve it, and then we can get rid of this note :-).
 Credits:
 --------
 
-O'Reilly Media supported the development of this tool by donating
-programmer time to the non-profits Code for America and Civic
-Commons, who in turn needed the tool for their work in helping open
-source public-sector code.
+[O'Reilly Media](https://oreilly.com/] supported the development
+of this tool by donating programmer time to the non-profits
+Code for America and Civic Commons, who in turn needed the tool
+for their work in helping open source public-sector code.
